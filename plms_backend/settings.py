@@ -142,10 +142,31 @@ if os.environ.get('CORS_ALLOWED_ORIGINS'):
         origin.strip().rstrip('/') for origin in os.environ.get('CORS_ALLOWED_ORIGINS').split(',') if origin.strip()
     ]
 
+# CSRF Trusted Origins Configuration
+CSRF_TRUSTED_ORIGINS = []
+
 if os.environ.get('CSRF_TRUSTED_ORIGINS'):
     CSRF_TRUSTED_ORIGINS = [
         origin.strip().rstrip('/') for origin in os.environ.get('CSRF_TRUSTED_ORIGINS').split(',') if origin.strip()
     ]
+
+# Auto-add Railway domain to trusted CSRF origins if available
+railway_domain = os.environ.get('RAILWAY_STATIC_URL')
+if railway_domain:
+    for proto in ['http', 'https']:
+        origin = f"{proto}://{railway_domain.strip()}"
+        if origin not in CSRF_TRUSTED_ORIGINS:
+            CSRF_TRUSTED_ORIGINS.append(origin)
+
+# Dynamically add all ALLOWED_HOSTS (except wildcard '*') to trusted CSRF origins
+for host in ALLOWED_HOSTS:
+    host_clean = host.strip()
+    if host_clean and host_clean != '*':
+        for proto in ['http', 'https']:
+            origin = f"{proto}://{host_clean}"
+            if origin not in CSRF_TRUSTED_ORIGINS:
+                CSRF_TRUSTED_ORIGINS.append(origin)
+
 
 # Silence Django USERNAME_FIELD global uniqueness requirement check
 SILENCED_SYSTEM_CHECKS = ["auth.E003"]
