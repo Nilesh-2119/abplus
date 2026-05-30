@@ -1,1 +1,1 @@
-web: python manage.py collectstatic --noinput && python manage.py migrate --noinput && python -c "import django; django.setup(); from django.contrib.auth import get_user_model; User = get_user_model(); User.objects.filter(username='admin').exists() or User.objects.create_superuser('admin', 'admin@example.com', 'admin123', role='SUPER_ADMIN')" && gunicorn plms_backend.wsgi --log-file -
+web: python manage.py migrate --noinput && gunicorn plms_backend.wsgi --log-file -
