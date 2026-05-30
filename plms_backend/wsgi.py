@@ -29,7 +29,7 @@ try:
 except Exception as e:
     print(f"Error running collectstatic programmatically: {e}", file=sys.stderr)
 
-# 2. Auto-create or force-reset default admin superuser permissions and password
+# 2. Auto-create default admin superuser if it doesn't exist
 try:
     from django.contrib.auth import get_user_model
     User = get_user_model()
@@ -42,18 +42,15 @@ try:
             'is_superuser': True
         }
     )
-    # Always set/reset password to 'admin123' and ensure permissions are correct
-    user.set_password('admin123')
-    user.is_staff = True
-    user.is_superuser = True
-    user.role = 'SUPER_ADMIN'
-    user.save()
     if created:
+        user.set_password('admin123')
+        user.save()
         print("Superuser 'admin' created successfully.")
     else:
-        print("Superuser 'admin' password and privileges forced/reset successfully.")
+        print("Superuser 'admin' already exists. Skipping setup.")
 except Exception as e:
-    print(f"Could not auto-create/reset superuser: {e}", file=sys.stderr)
+    print(f"Could not auto-create superuser: {e}", file=sys.stderr)
+
 
 
 # 3. Debug staticfiles directory
