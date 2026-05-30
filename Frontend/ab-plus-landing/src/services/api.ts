@@ -3,7 +3,18 @@
 // Switch IS_MOCK to false and configure API_URL to hook up to a real Django backend.
 
 export const IS_MOCK = false;
-export const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000/api";
+
+// Robustly formatting the API URL to ensure it has the correct prefix and no trailing slash
+const getSanitizedApiUrl = (): string => {
+  let url = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000/api";
+  url = url.trim().replace(/\/+$/, ""); // Trim whitespace and trailing slashes
+  if (!url.endsWith("/api")) {
+    url = url + "/api";
+  }
+  return url;
+};
+
+export const API_URL = getSanitizedApiUrl();
 
 export function getCookie(name: string): string | null {
   if (typeof document === "undefined") return null;
