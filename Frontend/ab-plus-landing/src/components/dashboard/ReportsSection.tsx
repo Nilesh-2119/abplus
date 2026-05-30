@@ -1,0 +1,1016 @@
+"use client";
+
+import { useEffect, useRef, useState } from "react";
+import { apiService, PatientEntry, LabSettings } from "@/services/api";
+import {
+  Printer,
+  Search,
+  RefreshCw,
+  FileText,
+  AlertCircle,
+  Eye,
+  ChevronLeft,
+  ChevronRight,
+  BookOpen,
+  CheckCircle2,
+} from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
+
+interface ReportsProps {
+  labId: string;
+  currentRole: string;
+}
+
+export default function ReportsSection({ labId, currentRole }: ReportsProps) {
+  const [patients, setPatients] = useState<PatientEntry[]>([]);
+  const [labSettings, setLabSettings] = useState<LabSettings | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [errorMsg, setErrorMsg] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [activePatient, setActivePatient] = useState<PatientEntry | null>(null);
+
+  // Print/Letterhead overlay adjustment states
+  const [useLetterhead, setUseLetterhead] = useState(true);
+  const [topPadding, setTopPadding] = useState(45); // default top offset in mm
+  const [bottomPadding, setBottomPadding] = useState(30); // default bottom offset in mm
+
+  // Page state — each "page" is either the header/patient-info or one test panel
+  const [currentPage, setCurrentPage] = useState(0);
+  const pageRefs = useRef<(HTMLDivElement | null)[]>([]);
+  const scrollContainerRef = useRef<HTMLDivElement | null>(null);
+
+  const fetchData = async () => {
+    setLoading(true);
+    try {
+      const data = await apiService.getPatients(labId, currentRole, searchQuery, "COMPLETED");
+      const deliveredData = await apiService.getPatients(labId, currentRole, searchQuery, "DELIVERED");
+      const combined = [...data, ...deliveredData].sort((a, b) => b.id.localeCompare(a.id));
+      setPatients(combined);
+      const settings = await apiService.getLabSettings(labId);
+      setLabSettings(settings);
+      setErrorMsg("");
+    } catch (e) {
+      console.error(e);
+      setErrorMsg("Failed to retrieve reports database.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchData();
+  }, [labId, searchQuery]);
+
+  // Reset to page 0 whenever patient changes
+  useEffect(() => {
+    setCurrentPage(0);
+    if (scrollContainerRef.current) {
+      scrollContainerRef.current.scrollTo({ top: 0, behavior: "smooth" });
+    }
+  }, [activePatient]);
+
+  const handlePrint = () => {
+    if (!activePatient) return;
+    window.print();
+  };
+
+  const getParamFlag = (value: number | undefined, min: number, max: number): "LOW" | "HIGH" | "NORMAL" | "" => {
+    if (value === undefined || isNaN(value)) return "";
+    if (value < min) return "LOW";
+    if (value > max) return "HIGH";
+    return "NORMAL";
+  };
+
+  // Build "pages": page 0 = cover/patient info, pages 1..N = one test each, last page = footer
+  const buildPages = (patient: PatientEntry) => {
+    type Page =
+      | { type: "cover" }
+      | { type: "test"; testIndex: number }
+      | { type: "footer" };
+    const pages: Page[] = [{ type: "cover" }];
+    patient.tests.forEach((_, idx) => pages.push({ type: "test", testIndex: idx }));
+    pages.push({ type: "footer" });
+    return pages;
+  };
+
+  const pages = activePatient ? buildPages(activePatient) : [];
+  const totalPages = pages.length;
+
+  const goToPage = (idx: number) => {
+    const clamped = Math.max(0, Math.min(idx, totalPages - 1));
+    setCurrentPage(clamped);
+    pageRefs.current[clamped]?.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
+
+  // Intersection observer to track current visible page
+  useEffect(() => {
+    if (!scrollContainerRef.current || totalPages === 0) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            const idx = Number(entry.target.getAttribute("data-page-idx"));
+            if (!isNaN(idx)) setCurrentPage(idx);
+          }
+        });
+      },
+      {
+        root: scrollContainerRef.current,
+        rootMargin: "0px",
+        threshold: 0.55,
+      }
+    );
+    pageRefs.current.forEach((ref) => {
+      if (ref) observer.observe(ref);
+    });
+    return () => observer.disconnect();
+  }, [activePatient, totalPages]);
+
+  // ── Render a single "page card" ──
+  const renderPageContent = (pageIdx: number) => {
+    if (!activePatient) return null;
+    const page = pages[pageIdx];
+
+    if (page.type === "cover") {
+      return (
+        <div className="space-y-5">
+          {/* Lab Letterhead */}
+          {(!useLetterhead || !labSettings?.letterhead_base64) ? (
+            <div className="flex justify-between items-start pb-5 border-b-2 border-slate-800 gap-4">
+              <div className="space-y-1">
+                {labSettings?.logo_base64 ? (
+                  <img src={labSettings.logo_base64} alt="Lab Logo" className="h-10 w-auto object-contain mb-2" />
+                ) : (
+                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-cyan-400 to-blue-600 font-syne text-[13px] font-black text-white shadow mb-2">
+                    AB+
+                  </div>
+                )}
+                <h2 className="text-[15px] font-black text-slate-900 font-syne uppercase tracking-wide">
+                  {labSettings?.name || "AB+ Pathology Laboratory"}
+                </h2>
+                <p className="text-[9px] text-slate-500 font-semibold leading-relaxed max-w-sm">
+                  {labSettings?.address || "710, Deccan Gymkhana, Pune, Maharashtra 411004"}
+                </p>
+                <p className="text-[9px] text-slate-400 font-bold">
+                  Phone: {labSettings?.phone || "+91 98765 43210"}
+                </p>
+              </div>
+              <div className="text-right space-y-1 shrink-0">
+                <span className="text-[10px] font-extrabold text-cyan-600 bg-cyan-50 px-2.5 py-1 rounded-lg border border-cyan-100 uppercase tracking-wider font-mono block">
+                  Pathology Diagnostics
+                </span>
+                <p className="text-[8px] text-slate-400 font-bold mt-1">Accreditation: ISO 9001:2015</p>
+              </div>
+            </div>
+          ) : (
+            <div className="flex justify-between items-center pb-2.5 border-b border-slate-100 text-[8px] font-bold text-slate-400 uppercase tracking-widest">
+              <span>Diagnostic Report</span>
+              <span>Confidential</span>
+            </div>
+          )}
+
+          {/* Patient Info Grid */}
+          <div>
+            <h3 className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-2.5">
+              Patient Information
+            </h3>
+            <div className="grid grid-cols-2 gap-y-2.5 gap-x-6 p-4 bg-slate-50 border border-slate-100 rounded-xl text-[9px] font-semibold text-slate-600">
+              <div className="flex justify-between">
+                <span className="text-slate-400">Patient ID</span>
+                <span className="font-mono font-black text-slate-800">{activePatient.id}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-400">Date Logged</span>
+                <span className="font-bold text-slate-800">{activePatient.created_at}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-400">Patient Name</span>
+                <span className="font-black text-slate-800">{activePatient.name}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-400">Sample Tubes</span>
+                <span className="font-bold text-slate-800 max-w-[120px] text-right truncate">
+                  {activePatient.tests.map((t) => t.tube_type).join(", ")}
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-400">Age / Gender</span>
+                <span className="font-bold text-slate-800">{activePatient.age} yrs / {activePatient.gender}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-400">Ref. Doctor</span>
+                <span className="font-bold text-slate-800">
+                  {activePatient.referred_doctor_name || "Self Ref"}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* Tests overview */}
+          <div>
+            <h3 className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-2.5">
+              Tests Ordered ({activePatient.tests.length})
+            </h3>
+            <div className="space-y-1.5">
+              {activePatient.tests.map((test, idx) => (
+                <button
+                  key={test.id}
+                  onClick={() => goToPage(idx + 1)}
+                  className="w-full flex items-center justify-between p-2.5 bg-white border border-slate-100 hover:border-cyan-200 hover:bg-cyan-50/30 rounded-xl text-left transition-all cursor-pointer group"
+                >
+                  <div className="flex items-center gap-2.5">
+                    <span className="h-6 w-6 rounded-lg bg-slate-100 group-hover:bg-cyan-100 flex items-center justify-center text-[9px] font-black text-slate-500 group-hover:text-cyan-600 transition-colors shrink-0">
+                      {idx + 1}
+                    </span>
+                    <span className="text-[10px] font-bold text-slate-700 group-hover:text-slate-900">{test.name}</span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-[8px] font-bold text-slate-400">{test.parameters.length} params</span>
+                    <ChevronRight size={11} className="text-slate-300 group-hover:text-cyan-500 transition-colors" />
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    if (page.type === "test") {
+      const test = activePatient.tests[page.testIndex];
+      return (
+        <div className="space-y-4">
+          {/* Test Panel Header */}
+          <div className="flex items-center justify-between pb-3 border-b-2 border-slate-800">
+            <div>
+              <h3 className="text-[13px] font-black text-slate-900 uppercase tracking-wide">{test.name}</h3>
+              <p className="text-[9px] text-slate-400 font-semibold mt-0.5">Report Panel</p>
+            </div>
+            <div className="text-right">
+              <span className="text-[9px] font-extrabold text-cyan-600 bg-cyan-50 px-2.5 py-1 rounded-lg border border-cyan-100 uppercase tracking-wider font-mono">
+                {activePatient.id}
+              </span>
+              <p className="text-[8px] text-slate-400 font-bold mt-1">{activePatient.name}</p>
+            </div>
+          </div>
+
+          {/* Results Table */}
+          <table className="w-full text-left border-collapse text-[9px] font-semibold">
+            <thead>
+              <tr className="bg-slate-50 border border-slate-100 text-slate-400 font-extrabold uppercase rounded-xl">
+                <th className="py-2.5 px-3 rounded-l-xl w-2/5">Investigation Name</th>
+                <th className="py-2.5 px-3 text-center w-1/5">Observed Value</th>
+                <th className="py-2.5 px-3 text-center w-1/5">Reference Range</th>
+                <th className="py-2.5 px-3 text-center w-1/5 rounded-r-xl">Unit</th>
+              </tr>
+            </thead>
+            <tbody>
+              {test.parameters.map((param, pIdx) => {
+                const val = activePatient.results[param.id];
+                const flag = getParamFlag(val, param.min_val, param.max_val);
+                const isLow = flag === "LOW";
+                const isHigh = flag === "HIGH";
+                const isAbnormal = isLow || isHigh;
+                return (
+                  <tr
+                    key={param.id}
+                    className={`border-b text-slate-700 transition-colors ${
+                      pIdx % 2 === 0 ? "bg-white" : "bg-slate-50/40"
+                    } ${isAbnormal ? "border-rose-100" : "border-slate-100"}`}
+                  >
+                    <td className="py-3 px-3 font-bold text-slate-800">{param.name}</td>
+                    <td className="py-3 px-3 text-center">
+                      <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg font-black text-[9px] ${
+                        isAbnormal
+                          ? "text-rose-600 bg-rose-50 border border-rose-200"
+                          : "text-emerald-700 bg-emerald-50 border border-emerald-100"
+                      }`}>
+                        {val !== undefined ? val : "—"}
+                        {isLow && <span className="text-[7px] font-black">↓</span>}
+                        {isHigh && <span className="text-[7px] font-black">↑</span>}
+                      </span>
+                    </td>
+                    <td className="py-3 px-3 text-center text-slate-500 font-mono">
+                      {param.min_val} – {param.max_val}
+                    </td>
+                    <td className="py-3 px-3 text-center text-slate-400">{param.unit}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+
+          {/* Abnormal note if any */}
+          {test.parameters.some((p) => {
+            const v = activePatient.results[p.id];
+            return getParamFlag(v, p.min_val, p.max_val) !== "NORMAL" && getParamFlag(v, p.min_val, p.max_val) !== "";
+          }) && (
+            <div className="flex items-start gap-2 p-2.5 bg-rose-50/60 border border-rose-100 rounded-xl">
+              <AlertCircle size={12} className="text-rose-400 mt-0.5 shrink-0" />
+              <p className="text-[9px] text-rose-600 font-semibold">
+                One or more values are outside the reference range. Please consult your physician.
+              </p>
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    if (page.type === "footer") {
+      return (
+        <div className="space-y-6">
+          {/* Summary */}
+          <div className="pb-4 border-b border-slate-200">
+            <h3 className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-3">Summary</h3>
+            <div className="grid grid-cols-3 gap-2 text-center">
+              <div className="bg-slate-50 border border-slate-100 rounded-xl p-3">
+                <span className="text-lg font-black text-slate-800">{activePatient.tests.length}</span>
+                <p className="text-[8px] font-bold text-slate-400 mt-0.5">Tests Ordered</p>
+              </div>
+              <div className="bg-emerald-50 border border-emerald-100 rounded-xl p-3">
+                <span className="text-lg font-black text-emerald-600">
+                  {activePatient.tests.reduce((s, t) => s + t.parameters.filter((p) => {
+                    const v = activePatient.results[p.id];
+                    return getParamFlag(v, p.min_val, p.max_val) === "NORMAL";
+                  }).length, 0)}
+                </span>
+                <p className="text-[8px] font-bold text-emerald-500 mt-0.5">Normal Values</p>
+              </div>
+              <div className="bg-rose-50 border border-rose-100 rounded-xl p-3">
+                <span className="text-lg font-black text-rose-600">
+                  {activePatient.tests.reduce((s, t) => s + t.parameters.filter((p) => {
+                    const v = activePatient.results[p.id];
+                    const f = getParamFlag(v, p.min_val, p.max_val);
+                    return f === "LOW" || f === "HIGH";
+                  }).length, 0)}
+                </span>
+                <p className="text-[8px] font-bold text-rose-400 mt-0.5">Abnormal Values</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Doctor sign-off */}
+          <div className="flex justify-between items-end gap-6">
+            <div className="text-[8px] font-bold text-slate-400 space-y-1">
+              <span className="block font-mono font-black text-slate-800 text-[9px]">BARCODE STAMP</span>
+              <span className="block">Diagnostic System Validation</span>
+              <span className="block font-mono text-slate-300">{activePatient.id}</span>
+            </div>
+            <div className="text-right space-y-1.5">
+              <div className="h-10 w-32 bg-slate-50 border border-dashed border-slate-200 flex items-center justify-center rounded-lg text-[7px] text-slate-300 font-extrabold uppercase italic select-none ml-auto">
+                Signature
+              </div>
+              <span className="block text-[9px] text-slate-800 font-black">Dr. Rajesh Sharma, MD</span>
+              <span className="block text-[7px] text-slate-400 font-semibold">Pathologist & Lab Director</span>
+            </div>
+          </div>
+
+          {/* Footer note */}
+          <div className="pt-4 border-t border-slate-100 text-center">
+            <p className="text-[8px] text-slate-400 font-semibold">
+              This report is generated electronically and is valid without signature when digitally authenticated.
+            </p>
+            <p className="text-[8px] text-slate-300 font-semibold mt-0.5">
+              {labSettings?.name || "AB+ Pathology"} • {labSettings?.address || "Pune, Maharashtra"}
+            </p>
+          </div>
+        </div>
+      );
+    }
+
+    return null;
+  };
+
+  return (
+    <div className="space-y-4">
+      {/* Print Styles */}
+      <style jsx global>{`
+        @media print {
+          @page {
+            size: A4;
+            margin: 0;
+          }
+          body {
+            margin: 0;
+            padding: 0;
+            background: white !important;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+          }
+          body * {
+            visibility: hidden;
+          }
+          #abplus-print-template, #abplus-print-template * {
+            visibility: visible;
+          }
+          #abplus-print-template {
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 210mm;
+            height: auto;
+            margin: 0;
+            padding: 0;
+            box-shadow: none !important;
+            border: none !important;
+            background: transparent !important;
+          }
+          .print-page {
+            width: 210mm !important;
+            height: 297mm !important;
+            page-break-after: always !important;
+            break-after: page !important;
+            box-sizing: border-box !important;
+            margin: 0 !important;
+            position: relative;
+            background-color: white !important;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+          }
+          .print-page-content {
+            height: 100% !important;
+            display: flex !important;
+            flex-direction: column !important;
+            justify-content: space-between !important;
+            box-sizing: border-box !important;
+          }
+        }
+      `}</style>
+
+      {/* ── Search Toolbar ── */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white/70 border border-slate-200/80 p-3 sm:p-4 rounded-2xl backdrop-blur-md shadow-sm">
+        <div className="flex-1 max-w-sm relative">
+          <Search size={14} className="absolute left-3.5 top-2.5 text-slate-400" />
+          <input
+            type="text"
+            placeholder="Search patient name, phone..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full pl-9 pr-4 py-2 rounded-xl border border-slate-200 bg-white text-xs font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-cyan-500/20"
+          />
+        </div>
+        <button
+          onClick={fetchData}
+          className="p-2 border border-slate-200 hover:bg-slate-50 text-slate-400 hover:text-slate-600 rounded-xl transition-colors bg-white shadow-sm"
+          title="Refresh"
+        >
+          <RefreshCw size={14} />
+        </button>
+      </div>
+
+      {errorMsg && (
+        <div className="flex items-center gap-2 p-3 text-xs font-bold text-red-600 bg-red-50 border border-red-100 rounded-xl">
+          <AlertCircle size={14} />
+          <span>{errorMsg}</span>
+        </div>
+      )}
+
+      {/* ── Main Two-Column Layout ── */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4" style={{ height: "calc(100vh - 200px)", minHeight: "560px" }}>
+
+        {/* LEFT: Patient List */}
+        <div className="lg:col-span-4 bg-white border border-slate-200/80 rounded-2xl shadow-sm flex flex-col overflow-hidden">
+          <div className="px-4 py-3 border-b border-slate-100 flex items-center gap-2 shrink-0">
+            <BookOpen size={14} className="text-cyan-500" />
+            <h3 className="text-[11px] font-black text-slate-800 uppercase tracking-wide">Pathology Reports List</h3>
+          </div>
+
+          <div className="flex-1 overflow-y-auto p-3 space-y-2">
+            {loading ? (
+              <div className="flex h-36 items-center justify-center text-slate-400">
+                <RefreshCw size={16} className="animate-spin text-cyan-500" />
+                <span className="ml-2 font-semibold text-xs">Loading...</span>
+              </div>
+            ) : patients.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-12 text-slate-400 text-center">
+                <FileText size={28} className="stroke-1 mb-2" />
+                <span className="text-[10px] font-bold">No verified reports found.</span>
+              </div>
+            ) : (
+              patients.map((pat) => {
+                const isActive = activePatient?.id === pat.id;
+                return (
+                  <button
+                    key={pat.id}
+                    onClick={() => setActivePatient(pat)}
+                    className={`w-full flex items-center justify-between p-3 rounded-xl border text-left transition-all cursor-pointer ${
+                      isActive
+                        ? "bg-cyan-50 border-cyan-400 shadow-sm shadow-cyan-100"
+                        : "bg-white border-slate-100 hover:bg-slate-50 hover:border-slate-200"
+                    }`}
+                  >
+                    <div className="space-y-0.5 min-w-0 flex-1">
+                      <span className={`block text-xs font-bold truncate ${isActive ? "text-cyan-700" : "text-slate-800"}`}>
+                        {pat.name}
+                      </span>
+                      <span className="block text-[8px] font-mono font-black text-slate-400 uppercase tracking-wide">
+                        {pat.id} • {pat.age}y • {pat.gender}
+                      </span>
+                      <span className="text-[8px] text-slate-400 font-semibold">
+                        {pat.tests.length} test{pat.tests.length !== 1 ? "s" : ""}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-1.5 shrink-0 ml-2">
+                      <span className={`text-[7px] font-extrabold px-1.5 py-0.5 rounded-lg uppercase tracking-wider ${
+                        pat.status === "DELIVERED"
+                          ? "bg-emerald-50 text-emerald-600 border border-emerald-100"
+                          : "bg-cyan-50 text-cyan-600 border border-cyan-100"
+                      }`}>
+                        {pat.status}
+                      </span>
+                      {isActive ? (
+                        <CheckCircle2 size={13} className="text-cyan-500" />
+                      ) : (
+                        <Eye size={12} className="text-slate-300" />
+                      )}
+                    </div>
+                  </button>
+                );
+              })
+            )}
+          </div>
+        </div>
+
+        {/* RIGHT: Page-Scroll Report Preview */}
+        <div className="lg:col-span-8 flex flex-col gap-3 overflow-hidden">
+          {activePatient ? (
+            <>
+              {/* Report Control Bar */}
+              <div className="bg-white border border-slate-200/80 rounded-2xl px-4 py-3 shadow-sm flex items-center justify-between shrink-0">
+                <div className="flex items-center gap-3">
+                  <div>
+                    <span className="text-[9px] font-extrabold text-slate-400 uppercase tracking-wider block">Selected File</span>
+                    <h4 className="text-xs font-black text-slate-800">{activePatient.name}
+                      <span className="text-slate-400 font-mono ml-1.5">({activePatient.id})</span>
+                    </h4>
+                  </div>
+                </div>
+                <button
+                  onClick={handlePrint}
+                  className="flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 px-4 py-2 text-xs font-bold text-white shadow-md shadow-cyan-500/20 hover:shadow-lg hover:shadow-cyan-500/30 transition-all cursor-pointer active:scale-95"
+                >
+                  <Printer size={13} />
+                  <span>Print Report Layout</span>
+                </button>
+              </div>
+
+              {/* Page Navigator */}
+              <div className="bg-white border border-slate-200/80 rounded-2xl px-4 py-2.5 shadow-sm flex items-center justify-between shrink-0">
+                <button
+                  onClick={() => goToPage(currentPage - 1)}
+                  disabled={currentPage === 0}
+                  className="flex items-center gap-1 px-3 py-1.5 text-[10px] font-bold text-slate-600 hover:bg-slate-50 rounded-xl border border-slate-200 disabled:opacity-30 disabled:cursor-not-allowed transition-all cursor-pointer"
+                >
+                  <ChevronLeft size={13} /> Prev
+                </button>
+
+                {/* Page dots */}
+                <div className="flex items-center gap-1.5">
+                  {pages.map((p, idx) => (
+                    <button
+                      key={idx}
+                      onClick={() => goToPage(idx)}
+                      title={
+                        p.type === "cover"
+                          ? "Cover / Patient Info"
+                          : p.type === "footer"
+                          ? "Summary & Sign-off"
+                          : `Test ${p.testIndex + 1}: ${activePatient.tests[p.testIndex].name}`
+                      }
+                      className={`transition-all rounded-full cursor-pointer ${
+                        idx === currentPage
+                          ? "w-6 h-2.5 bg-cyan-500"
+                          : "w-2.5 h-2.5 bg-slate-200 hover:bg-slate-300"
+                      }`}
+                    />
+                  ))}
+                </div>
+
+                <button
+                  onClick={() => goToPage(currentPage + 1)}
+                  disabled={currentPage === totalPages - 1}
+                  className="flex items-center gap-1 px-3 py-1.5 text-[10px] font-bold text-slate-600 hover:bg-slate-50 rounded-xl border border-slate-200 disabled:opacity-30 disabled:cursor-not-allowed transition-all cursor-pointer"
+                >
+                  Next <ChevronRight size={13} />
+                </button>
+              </div>
+
+              {/* Letterhead Print Adjustments Panel */}
+              <div className="bg-white border border-slate-200/80 rounded-2xl p-4 shadow-sm space-y-3 shrink-0">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      id="use-letterhead-toggle"
+                      disabled={!labSettings?.letterhead_base64}
+                      checked={useLetterhead && !!labSettings?.letterhead_base64}
+                      onChange={(e) => setUseLetterhead(e.target.checked)}
+                      className="h-4 w-4 rounded border-slate-300 text-cyan-600 focus:ring-cyan-500/20 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                    />
+                    <label
+                      htmlFor="use-letterhead-toggle"
+                      className={`text-xs font-black cursor-pointer ${
+                        labSettings?.letterhead_base64 ? "text-slate-700" : "text-slate-400"
+                      }`}
+                    >
+                      Overlay on Letterhead Background Image
+                    </label>
+                  </div>
+                  <span className="text-[8px] font-black text-cyan-600 bg-cyan-50 px-2.5 py-1 rounded-lg border border-cyan-100 uppercase tracking-widest self-start sm:self-auto font-mono">
+                    Print Offset Adjustments
+                  </span>
+                </div>
+
+                {labSettings?.letterhead_base64 ? (
+                  useLetterhead && (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-1 border-t border-slate-100/80">
+                      <div className="space-y-1">
+                        <div className="flex justify-between text-[10px] font-bold text-slate-500">
+                          <span>Top Padding (Header margin)</span>
+                          <span className="font-mono text-cyan-600 font-bold">{topPadding}mm</span>
+                        </div>
+                        <input
+                          type="range"
+                          min="20"
+                          max="100"
+                          value={topPadding}
+                          onChange={(e) => setTopPadding(Number(e.target.value))}
+                          className="w-full h-1 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-cyan-500"
+                        />
+                        <p className="text-[8px] text-slate-400 font-medium">Clear pre-printed headers (logo/address block).</p>
+                      </div>
+
+                      <div className="space-y-1">
+                        <div className="flex justify-between text-[10px] font-bold text-slate-500">
+                          <span>Bottom Padding (Footer margin)</span>
+                          <span className="font-mono text-cyan-600 font-bold">{bottomPadding}mm</span>
+                        </div>
+                        <input
+                          type="range"
+                          min="10"
+                          max="60"
+                          value={bottomPadding}
+                          onChange={(e) => setBottomPadding(Number(e.target.value))}
+                          className="w-full h-1 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-cyan-500"
+                        />
+                        <p className="text-[8px] text-slate-400 font-medium">Clear pre-printed footer lines/contact details.</p>
+                      </div>
+                    </div>
+                  )
+                ) : (
+                  <p className="text-[9px] text-slate-400 font-bold uppercase tracking-wide flex items-center gap-1.5 bg-slate-50 p-2 rounded-xl border border-slate-100">
+                    <span className="h-1.5 w-1.5 rounded-full bg-amber-400 shrink-0" />
+                    No letterhead image uploaded. Upload one under Lab Settings to overlay reports onto official letterheads.
+                  </p>
+                )}
+              </div>
+
+              {/* Page counter label */}
+              <div className="text-center -mt-1.5">
+                <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">
+                  {currentPage === 0
+                    ? "Cover · Patient Info"
+                    : currentPage === totalPages - 1
+                    ? "Summary · Sign-off"
+                    : `Test ${currentPage} of ${totalPages - 2} · ${activePatient.tests[currentPage - 1]?.name}`}
+                </span>
+              </div>
+
+              {/* Scrollable Pages Container */}
+              <div
+                ref={scrollContainerRef}
+                className="flex-1 overflow-y-auto space-y-6 pr-1"
+                style={{ scrollBehavior: "smooth" }}
+              >
+                {/* Hidden print template — all pages */}
+                <div id="abplus-print-template" className="hidden print:block w-[210mm] mx-auto p-0 bg-white">
+                  {pages.map((page, idx) => (
+                    <div
+                      key={idx}
+                      className="print-page relative bg-white overflow-hidden"
+                      style={{
+                        width: "210mm",
+                        height: "297mm",
+                        pageBreakAfter: "always",
+                        backgroundImage: useLetterhead && labSettings?.letterhead_base64 ? `url(${labSettings.letterhead_base64})` : "none",
+                        backgroundSize: "100% 100%",
+                        backgroundPosition: "center",
+                        backgroundRepeat: "no-repeat",
+                        paddingTop: useLetterhead && labSettings?.letterhead_base64 ? `${topPadding}mm` : "20mm",
+                        paddingBottom: useLetterhead && labSettings?.letterhead_base64 ? `${bottomPadding}mm` : "20mm",
+                        paddingLeft: "20mm",
+                        paddingRight: "20mm",
+                        boxSizing: "border-box",
+                      }}
+                    >
+                      <div className="print-page-content h-full flex flex-col justify-between">
+                        {/* Page Content */}
+                        <div className="flex-1">
+                          {/* If cover page and text header is needed */}
+                          {page.type === "cover" && (
+                            <div className="space-y-6">
+                              {(!useLetterhead || !labSettings?.letterhead_base64) && (
+                                <div className="flex justify-between items-start pb-4 border-b border-slate-300 gap-4 mb-4">
+                                  <div className="space-y-1">
+                                    {labSettings?.logo_base64 ? (
+                                      <img src={labSettings.logo_base64} alt="Lab Logo" className="h-8 w-auto object-contain mb-1" />
+                                    ) : (
+                                      <div className="flex h-8 w-8 items-center justify-center rounded bg-gradient-to-br from-cyan-400 to-blue-600 font-syne text-[11px] font-black text-white shadow mb-1">
+                                        AB+
+                                      </div>
+                                    )}
+                                    <h2 className="text-[13px] font-black text-slate-900 font-syne uppercase tracking-wide">
+                                      {labSettings?.name || "AB+ Pathology Laboratory"}
+                                    </h2>
+                                    <p className="text-[8px] text-slate-500 font-semibold leading-relaxed max-w-sm">
+                                      {labSettings?.address}
+                                    </p>
+                                    <p className="text-[8px] text-slate-400 font-bold">
+                                      Phone: {labSettings?.phone}
+                                    </p>
+                                  </div>
+                                  <div className="text-right space-y-0.5">
+                                    <span className="text-[9px] font-extrabold text-cyan-600 bg-cyan-50 px-2 py-0.5 rounded border uppercase tracking-wider font-mono">
+                                      Pathology Diagnostics
+                                    </span>
+                                    <p className="text-[7px] text-slate-400 font-bold mt-1">Accreditation: ISO 9001:2015</p>
+                                  </div>
+                                </div>
+                              )}
+
+                              {useLetterhead && labSettings?.letterhead_base64 && (
+                                <div className="text-right text-[8px] font-bold text-slate-400 uppercase tracking-widest pb-2 border-b border-slate-100 mb-4">
+                                  Diagnostic Report
+                                </div>
+                              )}
+
+                              {/* Patient Info Grid */}
+                              <div>
+                                <h3 className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-2.5">
+                                  Patient Information
+                                </h3>
+                                <div className="grid grid-cols-2 gap-y-2.5 gap-x-6 p-4 bg-slate-50 border border-slate-100 rounded-xl text-[9px] font-semibold text-slate-600">
+                                  <div className="flex justify-between">
+                                    <span className="text-slate-400">Patient ID:</span>
+                                    <span className="font-mono font-black text-slate-800">{activePatient.id}</span>
+                                  </div>
+                                  <div className="flex justify-between">
+                                    <span className="text-slate-400">Date Logged:</span>
+                                    <span className="font-bold text-slate-800">{activePatient.created_at}</span>
+                                  </div>
+                                  <div className="flex justify-between">
+                                    <span className="text-slate-400">Patient Name:</span>
+                                    <span className="font-black text-slate-800">{activePatient.name}</span>
+                                  </div>
+                                  <div className="flex justify-between">
+                                    <span className="text-slate-400">Sample Tube:</span>
+                                    <span className="font-bold text-slate-800">{activePatient.tests.map(t => t.tube_type).join(", ")}</span>
+                                  </div>
+                                  <div className="flex justify-between">
+                                    <span className="text-slate-400">Age / Gender:</span>
+                                    <span className="font-bold text-slate-800">{activePatient.age} yrs / {activePatient.gender}</span>
+                                  </div>
+                                  <div className="flex justify-between">
+                                    <span className="text-slate-400">Ref Doctor:</span>
+                                    <span className="font-bold text-slate-800">{activePatient.referred_doctor_name || "Self Ref"}</span>
+                                  </div>
+                                </div>
+                              </div>
+
+                              {/* Tests list */}
+                              <div>
+                                <h3 className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-2.5">
+                                  Tests Ordered & Diagnostic Status
+                                </h3>
+                                <div className="border border-slate-100 rounded-xl overflow-hidden divide-y divide-slate-100">
+                                  {activePatient.tests.map((test, testIdx) => (
+                                    <div key={test.id} className="flex items-center justify-between p-3 bg-white text-[9px] font-semibold">
+                                      <div className="flex items-center gap-2">
+                                        <span className="h-5 w-5 rounded bg-slate-100 flex items-center justify-center font-black text-slate-500">
+                                          {testIdx + 1}
+                                        </span>
+                                        <span className="font-bold text-slate-700">{test.name}</span>
+                                      </div>
+                                      <span className="text-slate-400">{test.parameters.length} parameters analyzed</span>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            </div>
+                          )}
+
+                          {page.type === "test" && (() => {
+                            const test = activePatient.tests[page.testIndex];
+                            return (
+                              <div className="space-y-4">
+                                <div className="flex items-center justify-between pb-2.5 border-b-2 border-slate-800">
+                                  <div>
+                                    <h3 className="text-[12px] font-black text-slate-900 uppercase tracking-wide">{test.name}</h3>
+                                    <p className="text-[8px] text-slate-400 font-semibold mt-0.5">Report Panel</p>
+                                  </div>
+                                  <div className="text-right">
+                                    <span className="text-[8px] font-extrabold text-cyan-600 bg-cyan-50 px-2 py-0.5 rounded border uppercase tracking-wider font-mono">
+                                      {activePatient.id}
+                                    </span>
+                                    <p className="text-[8px] text-slate-400 font-bold mt-1">{activePatient.name}</p>
+                                  </div>
+                                </div>
+
+                                <table className="w-full text-left border-collapse text-[9px] font-semibold">
+                                  <thead>
+                                    <tr className="bg-slate-50 border border-slate-100 text-slate-400 font-extrabold uppercase">
+                                      <th className="py-2 px-3 w-2/5">Investigation Name</th>
+                                      <th className="py-2 px-3 text-center w-1/5">Observed Value</th>
+                                      <th className="py-2 px-3 text-center w-1/5">Reference Range</th>
+                                      <th className="py-2 px-3 text-center w-1/5">Unit</th>
+                                    </tr>
+                                  </thead>
+                                  <tbody>
+                                    {test.parameters.map((param, pIdx) => {
+                                      const val = activePatient.results[param.id];
+                                      const flag = getParamFlag(val, param.min_val, param.max_val);
+                                      const isLow = flag === "LOW";
+                                      const isHigh = flag === "HIGH";
+                                      const isAbnormal = isLow || isHigh;
+                                      return (
+                                        <tr
+                                          key={param.id}
+                                          className={`border-b text-slate-700 ${
+                                            pIdx % 2 === 0 ? "bg-white" : "bg-slate-50/20"
+                                          } ${isAbnormal ? "border-rose-100 bg-rose-50/10" : "border-slate-100"}`}
+                                        >
+                                          <td className="py-2.5 px-3 font-bold text-slate-800">{param.name}</td>
+                                          <td className="py-2.5 px-3 text-center">
+                                            <span className={`inline-flex items-center gap-0.5 px-2 py-0.5 rounded font-black text-[9px] ${
+                                              isAbnormal ? "text-rose-600 bg-rose-50 border border-rose-100" : "text-slate-800"
+                                            }`}>
+                                              {val !== undefined ? val : "Awaiting Lab"}
+                                            </span>
+                                          </td>
+                                          <td className="py-2.5 px-3 text-center text-slate-500 font-mono">
+                                            {param.min_val} – {param.max_val}
+                                          </td>
+                                          <td className="py-2.5 px-3 text-center text-slate-400">{param.unit}</td>
+                                        </tr>
+                                      );
+                                    })}
+                                  </tbody>
+                                </table>
+                              </div>
+                            );
+                          })()}
+
+                          {page.type === "footer" && (
+                            <div className="space-y-6">
+                              <div className="pb-4 border-b border-slate-200">
+                                <h3 className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-3">Diagnostic Summary</h3>
+                                <div className="grid grid-cols-3 gap-2 text-center">
+                                  <div className="bg-slate-50 border border-slate-100 rounded-xl p-3">
+                                    <span className="text-lg font-black text-slate-800">{activePatient.tests.length}</span>
+                                    <p className="text-[8px] font-bold text-slate-400 mt-0.5">Tests Ordered</p>
+                                  </div>
+                                  <div className="bg-emerald-50 border border-emerald-100 rounded-xl p-3">
+                                    <span className="text-lg font-black text-emerald-600">
+                                      {activePatient.tests.reduce((s, t) => s + t.parameters.filter((p) => {
+                                        const v = activePatient.results[p.id];
+                                        return getParamFlag(v, p.min_val, p.max_val) === "NORMAL";
+                                      }).length, 0)}
+                                    </span>
+                                    <p className="text-[8px] font-bold text-emerald-500 mt-0.5">Normal Values</p>
+                                  </div>
+                                  <div className="bg-rose-50 border border-rose-100 rounded-xl p-3">
+                                    <span className="text-lg font-black text-rose-600">
+                                      {activePatient.tests.reduce((s, t) => s + t.parameters.filter((p) => {
+                                        const v = activePatient.results[p.id];
+                                        const f = getParamFlag(v, p.min_val, p.max_val);
+                                        return f === "LOW" || f === "HIGH";
+                                      }).length, 0)}
+                                    </span>
+                                    <p className="text-[8px] font-bold text-rose-400 mt-0.5">Abnormal Values</p>
+                                  </div>
+                                </div>
+                              </div>
+
+                              <div className="flex justify-between items-end gap-6 pt-4">
+                                <div className="text-[8px] font-bold text-slate-400 space-y-1">
+                                  <span className="block font-mono font-black text-slate-800 text-[9px]">BARCODE STAMP</span>
+                                  <span className="block">Diagnostic System Validation</span>
+                                  <span className="block font-mono text-slate-300">{activePatient.id}</span>
+                                </div>
+                                <div className="text-right space-y-1">
+                                  <div className="h-10 w-32 bg-slate-50 border border-dashed border-slate-200 flex items-center justify-center rounded-lg text-[7px] text-slate-300 font-extrabold uppercase italic ml-auto select-none">
+                                    Signature
+                                  </div>
+                                  <span className="block text-[9px] text-slate-800 font-black">Dr. Rajesh Sharma, MD</span>
+                                  <span className="block text-[7px] text-slate-400 font-semibold">Pathologist & Lab Director</span>
+                                </div>
+                              </div>
+
+                              <div className="pt-6 border-t border-slate-100 text-center space-y-1">
+                                <p className="text-[8px] text-slate-400 font-semibold">
+                                  This report is generated electronically and is valid without signature when digitally authenticated.
+                                </p>
+                                <p className="text-[7px] text-slate-300">
+                                  {labSettings?.name} • {labSettings?.address}
+                                </p>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Page Footer */}
+                        <div className="flex justify-between items-center text-[8px] font-bold text-slate-400 uppercase tracking-wider border-t border-slate-100 pt-2 shrink-0">
+                          <span>{activePatient.name} ({activePatient.id})</span>
+                          <span>Page {idx + 1} of {totalPages}</span>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Visible paged content */}
+                {pages.map((_, pageIdx) => (
+                  <motion.div
+                    key={pageIdx}
+                    ref={(el) => { pageRefs.current[pageIdx] = el; }}
+                    data-page-idx={pageIdx}
+                    initial={{ opacity: 0, y: 16 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: pageIdx * 0.04, duration: 0.35 }}
+                    className={`relative bg-white rounded-2xl shadow-md border transition-all duration-300 overflow-hidden flex flex-col shrink-0 w-[210mm] max-w-full aspect-[210/297] mx-auto ${
+                      pageIdx === currentPage
+                        ? "border-cyan-300 shadow-cyan-100/50 shadow-lg ring-1 ring-cyan-200/50"
+                        : "border-slate-200/80"
+                    }`}
+                    style={{
+                      backgroundImage: useLetterhead && labSettings?.letterhead_base64 ? `url(${labSettings.letterhead_base64})` : "none",
+                      backgroundSize: "100% 100%",
+                      backgroundPosition: "center",
+                      backgroundRepeat: "no-repeat",
+                      backgroundColor: "white",
+                    }}
+                  >
+                    {/* Page top edge highlight */}
+                    <div className={`absolute top-0 left-0 right-0 h-0.5 rounded-t-2xl transition-all ${
+                      pageIdx === currentPage ? "bg-gradient-to-r from-cyan-400 to-blue-500" : "bg-slate-100"
+                    }`} />
+
+                    {/* Page number badge */}
+                    <div className="absolute top-3 right-4 flex items-center gap-1.5 z-10">
+                      <span className={`text-[8px] font-extrabold px-2 py-0.5 rounded-full border font-mono tracking-wider ${
+                        pageIdx === currentPage
+                          ? "text-cyan-600 bg-cyan-50 border-cyan-200 shadow-sm"
+                          : "text-slate-400 bg-slate-50 border-slate-200"
+                      }`}>
+                        {pageIdx + 1} / {totalPages}
+                      </span>
+                    </div>
+
+                    {/* Page content wrapper with dynamic margins */}
+                    <div
+                      className="p-6 flex-1 flex flex-col justify-between overflow-hidden"
+                      style={{
+                        paddingTop: useLetterhead && labSettings?.letterhead_base64 ? `${topPadding}mm` : "2rem",
+                        paddingBottom: useLetterhead && labSettings?.letterhead_base64 ? `${bottomPadding}mm` : "2rem",
+                        paddingLeft: useLetterhead && labSettings?.letterhead_base64 ? "20mm" : "1.5rem",
+                        paddingRight: useLetterhead && labSettings?.letterhead_base64 ? "20mm" : "1.5rem",
+                        boxSizing: "border-box",
+                      }}
+                    >
+                      <div className="flex-1 flex flex-col justify-between h-full">
+                        <div className="flex-1">
+                          {renderPageContent(pageIdx)}
+                        </div>
+                        <div className="flex justify-between items-center text-[8px] font-bold text-slate-400 uppercase tracking-wider border-t border-slate-100 pt-2 shrink-0 mt-4">
+                          <span>{activePatient.name} ({activePatient.id})</span>
+                          <span>Page {pageIdx + 1} of {totalPages}</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Bottom shadow for paper depth effect */}
+                    <div className="absolute bottom-0 left-4 right-4 h-1 bg-gradient-to-b from-transparent to-slate-100/30 rounded-b-xl" />
+                  </motion.div>
+                ))}
+              </div>
+            </>
+          ) : (
+            <div className="flex-1 bg-white border border-slate-200/80 rounded-2xl shadow-sm flex flex-col items-center justify-center text-center text-slate-400 p-8">
+              <div className="h-16 w-16 bg-slate-50 border border-slate-100 rounded-2xl flex items-center justify-center mb-4">
+                <BookOpen size={28} className="stroke-1 text-slate-300" />
+              </div>
+              <h3 className="font-syne text-[13px] font-extrabold text-slate-700 mb-1">No Report Selected</h3>
+              <p className="text-[10px] text-slate-400 font-semibold max-w-xs">
+                Select a completed patient report from the list to preview it page by page.
+              </p>
+              <div className="flex items-center gap-2 mt-4 text-[9px] text-slate-400 font-semibold">
+                <ChevronLeft size={11} />
+                <span>Pick a patient from the left panel</span>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
