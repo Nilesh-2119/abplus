@@ -139,12 +139,12 @@ CORS_ALLOW_CREDENTIALS = True
 
 if os.environ.get('CORS_ALLOWED_ORIGINS'):
     CORS_ALLOWED_ORIGINS = [
-        origin.strip() for origin in os.environ.get('CORS_ALLOWED_ORIGINS').split(',') if origin.strip()
+        origin.strip().rstrip('/') for origin in os.environ.get('CORS_ALLOWED_ORIGINS').split(',') if origin.strip()
     ]
 
 if os.environ.get('CSRF_TRUSTED_ORIGINS'):
     CSRF_TRUSTED_ORIGINS = [
-        origin.strip() for origin in os.environ.get('CSRF_TRUSTED_ORIGINS').split(',') if origin.strip()
+        origin.strip().rstrip('/') for origin in os.environ.get('CSRF_TRUSTED_ORIGINS').split(',') if origin.strip()
     ]
 
 # Silence Django USERNAME_FIELD global uniqueness requirement check
