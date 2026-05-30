@@ -67,7 +67,7 @@ WSGI_APPLICATION = 'plms_backend.wsgi.application'
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.mysql',
-        'NAME': os.environ.get('MYSQLDATABASE', os.environ.get('DB_NAME', 'ab_plus')),
+        'NAME': os.environ.get('MYSQLDATABASE', os.environ.get('MYSQL_DATABASE', os.environ.get('DB_NAME', 'ab_plus'))),
         'USER': os.environ.get('MYSQLUSER', os.environ.get('DB_USER', 'root')),
         'PASSWORD': os.environ.get('MYSQLPASSWORD', os.environ.get('DB_PASSWORD', 'root')),
         'HOST': os.environ.get('MYSQLHOST', os.environ.get('DB_HOST', '127.0.0.1')),
