@@ -96,7 +96,7 @@ class Lab(SoftDeleteModel):
             base_code = cleaned_name[:30] if cleaned_name else "LAB"
             code = base_code
             counter = 1
-            while self.__class__.objects.filter(lab_code=code).exclude(id=self.id).exists():
+            while self.__class__.all_objects.filter(lab_code=code).exclude(id=self.id).exists():
                 code = f"{base_code}{counter}"
                 counter += 1
             self.lab_code = code

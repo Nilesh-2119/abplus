@@ -64,7 +64,7 @@ class LabCreateSerializer(serializers.Serializer):
             import re
             if not re.match(r'^[A-Z0-9]+$', val):
                 raise serializers.ValidationError("Lab Code must contain only alphanumeric characters (no spaces or special characters).")
-            if Lab.objects.filter(lab_code=val).exists():
+            if Lab.all_objects.filter(lab_code=val).exists():
                 raise serializers.ValidationError("This Lab Code is already taken.")
             return val
         return value
