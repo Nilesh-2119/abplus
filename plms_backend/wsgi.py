@@ -51,8 +51,12 @@ try:
 except Exception as e:
     print(f"Could not auto-create superuser: {e}", file=sys.stderr)
 
-
-
+# 2.5 Seed default master tests and parameters if they don't exist
+try:
+    from backend.seed_data import seed_master_tests
+    seed_master_tests()
+except Exception as e:
+    print(f"Failed to invoke seed_master_tests: {e}", file=sys.stderr)
 # 3. Debug staticfiles directory
 try:
     base_dir = Path(__file__).resolve().parent.parent

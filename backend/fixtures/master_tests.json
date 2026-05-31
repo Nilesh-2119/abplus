@@ -1,0 +1,1513 @@
+[
+    {
+        "id": "MTEST-CBC",
+        "name": "Complete Hemogram / CBC",
+        "category": "Hematology",
+        "code": "CBC",
+        "default_price": 350.0,
+        "tube_type": "EDTA",
+        "tube_color": "Purple",
+        "is_active": true,
+        "parameters": [
+            {
+                "id": "MPARAM-HEMO",
+                "name": "Hemoglobin",
+                "unit": "g/dL",
+                "min_val": 12.0,
+                "max_val": 17.0
+            },
+            {
+                "id": "MPARAM-WBC",
+                "name": "WBC Count",
+                "unit": "cells/mcL",
+                "min_val": 4000.0,
+                "max_val": 11000.0
+            },
+            {
+                "id": "MPARAM-PLATE",
+                "name": "Platelet Count",
+                "unit": "lakhs/mcL",
+                "min_val": 1.5,
+                "max_val": 4.5
+            },
+            {
+                "id": "MPARAM-RBCCOU",
+                "name": "RBC Count",
+                "unit": "million/mcL",
+                "min_val": 4.5,
+                "max_val": 5.9
+            },
+            {
+                "id": "MPARAM-PCVHEM",
+                "name": "PCV (Hematocrit)",
+                "unit": "%",
+                "min_val": 36.0,
+                "max_val": 50.0
+            },
+            {
+                "id": "MPARAM-MCV",
+                "name": "MCV",
+                "unit": "fL",
+                "min_val": 80.0,
+                "max_val": 100.0
+            },
+            {
+                "id": "MPARAM-MCH",
+                "name": "MCH",
+                "unit": "pg",
+                "min_val": 27.0,
+                "max_val": 32.0
+            },
+            {
+                "id": "MPARAM-MCHC",
+                "name": "MCHC",
+                "unit": "g/dL",
+                "min_val": 32.0,
+                "max_val": 36.0
+            }
+        ]
+    },
+    {
+        "id": "MTEST-PSMP",
+        "name": "PS for MP",
+        "category": "Hematology",
+        "code": "PSMP",
+        "default_price": 150.0,
+        "tube_type": "Slide",
+        "tube_color": "Purple",
+        "is_active": true,
+        "parameters": [
+            {
+                "id": "MPARAM-MALARI",
+                "name": "Malaria Parasite",
+                "unit": "Presence",
+                "min_val": 0.0,
+                "max_val": 0.0
+            }
+        ]
+    },
+    {
+        "id": "MTEST-WIDAL",
+        "name": "Widal Test",
+        "category": "Hematology",
+        "code": "WIDAL",
+        "default_price": 250.0,
+        "tube_type": "Serum",
+        "tube_color": "Red",
+        "is_active": true,
+        "parameters": [
+            {
+                "id": "MPARAM-SALMON",
+                "name": "Salmonella Typhi O",
+                "unit": "Titre",
+                "min_val": 0.0,
+                "max_val": 80.0
+            },
+            {
+                "id": "MPARAM-SALMON",
+                "name": "Salmonella Typhi H",
+                "unit": "Titre",
+                "min_val": 0.0,
+                "max_val": 80.0
+            },
+            {
+                "id": "MPARAM-SALMON",
+                "name": "Salmonella Typhi AH",
+                "unit": "Titre",
+                "min_val": 0.0,
+                "max_val": 80.0
+            },
+            {
+                "id": "MPARAM-SALMON",
+                "name": "Salmonella Typhi BH",
+                "unit": "Titre",
+                "min_val": 0.0,
+                "max_val": 80.0
+            }
+        ]
+    },
+    {
+        "id": "MTEST-BG",
+        "name": "Blood Group",
+        "category": "Hematology",
+        "code": "BG",
+        "default_price": 150.0,
+        "tube_type": "EDTA",
+        "tube_color": "Purple",
+        "is_active": true,
+        "parameters": [
+            {
+                "id": "MPARAM-ABOGRO",
+                "name": "ABO Grouping",
+                "unit": "Text",
+                "min_val": 0.0,
+                "max_val": 0.0
+            },
+            {
+                "id": "MPARAM-RHFACT",
+                "name": "Rh Factor",
+                "unit": "Text",
+                "min_val": 0.0,
+                "max_val": 0.0
+            }
+        ]
+    },
+    {
+        "id": "MTEST-BTCT",
+        "name": "BT CT",
+        "category": "Hematology",
+        "code": "BTCT",
+        "default_price": 120.0,
+        "tube_type": "Capillary",
+        "tube_color": "N/A",
+        "is_active": true,
+        "parameters": [
+            {
+                "id": "MPARAM-BLEEDI",
+                "name": "Bleeding Time",
+                "unit": "mins",
+                "min_val": 1.0,
+                "max_val": 5.0
+            },
+            {
+                "id": "MPARAM-CLOTTI",
+                "name": "Clotting Time",
+                "unit": "mins",
+                "min_val": 3.0,
+                "max_val": 9.0
+            }
+        ]
+    },
+    {
+        "id": "MTEST-PTINR",
+        "name": "PT INR / APTT",
+        "category": "Hematology",
+        "code": "PTINR",
+        "default_price": 450.0,
+        "tube_type": "Citrate",
+        "tube_color": "Blue",
+        "is_active": true,
+        "parameters": [
+            {
+                "id": "MPARAM-PROTHR",
+                "name": "Prothrombin Time",
+                "unit": "secs",
+                "min_val": 11.0,
+                "max_val": 15.0
+            },
+            {
+                "id": "MPARAM-INR",
+                "name": "INR",
+                "unit": "Ratio",
+                "min_val": 0.8,
+                "max_val": 1.2
+            },
+            {
+                "id": "MPARAM-APTT",
+                "name": "APTT",
+                "unit": "secs",
+                "min_val": 25.0,
+                "max_val": 35.0
+            }
+        ]
+    },
+    {
+        "id": "MTEST-ESR",
+        "name": "ESR",
+        "category": "Hematology",
+        "code": "ESR",
+        "default_price": 120.0,
+        "tube_type": "Citrate",
+        "tube_color": "Black",
+        "is_active": true,
+        "parameters": [
+            {
+                "id": "MPARAM-ESR",
+                "name": "ESR",
+                "unit": "mm/1st hr",
+                "min_val": 0.0,
+                "max_val": 15.0
+            }
+        ]
+    },
+    {
+        "id": "MTEST-MALAG",
+        "name": "Rapid Malaria Ag",
+        "category": "Hematology",
+        "code": "MALAG",
+        "default_price": 280.0,
+        "tube_type": "EDTA",
+        "tube_color": "Purple",
+        "is_active": true,
+        "parameters": [
+            {
+                "id": "MPARAM-P.FALC",
+                "name": "P. falciparum Ag",
+                "unit": "Index",
+                "min_val": 0.0,
+                "max_val": 0.9
+            },
+            {
+                "id": "MPARAM-P.VIVA",
+                "name": "P. vivax Ag",
+                "unit": "Index",
+                "min_val": 0.0,
+                "max_val": 0.9
+            }
+        ]
+    },
+    {
+        "id": "MTEST-DENGUE",
+        "name": "Dengue NS1 / IgG / IgM",
+        "category": "Hematology",
+        "code": "DENGUE",
+        "default_price": 650.0,
+        "tube_type": "Serum",
+        "tube_color": "Red",
+        "is_active": true,
+        "parameters": [
+            {
+                "id": "MPARAM-DENGUE",
+                "name": "Dengue NS1 Ag",
+                "unit": "Index",
+                "min_val": 0.0,
+                "max_val": 0.9
+            },
+            {
+                "id": "MPARAM-DENGUE",
+                "name": "Dengue IgG Ab",
+                "unit": "Index",
+                "min_val": 0.0,
+                "max_val": 0.9
+            },
+            {
+                "id": "MPARAM-DENGUE",
+                "name": "Dengue IgM Ab",
+                "unit": "Index",
+                "min_val": 0.0,
+                "max_val": 0.9
+            }
+        ]
+    },
+    {
+        "id": "MTEST-BSLR",
+        "name": "BSL (R)",
+        "category": "Diabetes",
+        "code": "BSLR",
+        "default_price": 80.0,
+        "tube_type": "Fluoride",
+        "tube_color": "Grey",
+        "is_active": true,
+        "parameters": [
+            {
+                "id": "MPARAM-RBG",
+                "name": "Random Blood Glucose",
+                "unit": "mg/dL",
+                "min_val": 70.0,
+                "max_val": 140.0
+            }
+        ]
+    },
+    {
+        "id": "MTEST-BSLFPP",
+        "name": "Blood Sugar F/PP",
+        "category": "Diabetes",
+        "code": "BSL-FPP",
+        "default_price": 150.0,
+        "tube_type": "Fluoride",
+        "tube_color": "Grey",
+        "is_active": true,
+        "parameters": [
+            {
+                "id": "MPARAM-FASTING",
+                "name": "Fasting Sugar",
+                "unit": "mg/dL",
+                "min_val": 70.0,
+                "max_val": 100.0
+            },
+            {
+                "id": "MPARAM-POSTPR",
+                "name": "Post-Prandial Sugar",
+                "unit": "mg/dL",
+                "min_val": 70.0,
+                "max_val": 140.0
+            }
+        ]
+    },
+    {
+        "id": "MTEST-HBA1C",
+        "name": "HbA1c",
+        "category": "Diabetes",
+        "code": "HBA1C",
+        "default_price": 300.0,
+        "tube_type": "EDTA",
+        "tube_color": "Purple",
+        "is_active": true,
+        "parameters": [
+            {
+                "id": "MPARAM-HBA1C",
+                "name": "HbA1c (Glycated Hb)",
+                "unit": "%",
+                "min_val": 4.0,
+                "max_val": 5.6
+            },
+            {
+                "id": "MPARAM-GLUC",
+                "name": "Avg Glucose",
+                "unit": "mg/dL",
+                "min_val": 70.0,
+                "max_val": 114.0
+            }
+        ]
+    },
+    {
+        "id": "MTEST-GTT",
+        "name": "GTT",
+        "category": "Diabetes",
+        "code": "GTT",
+        "default_price": 250.0,
+        "tube_type": "Fluoride",
+        "tube_color": "Grey",
+        "is_active": true,
+        "parameters": [
+            {
+                "id": "MPARAM-FASTIN",
+                "name": "Fasting Glucose",
+                "unit": "mg/dL",
+                "min_val": 70.0,
+                "max_val": 100.0
+            },
+            {
+                "id": "MPARAM-1HRGLU",
+                "name": "1Hr Glucose",
+                "unit": "mg/dL",
+                "min_val": 70.0,
+                "max_val": 180.0
+            },
+            {
+                "id": "MPARAM-2HRGLU",
+                "name": "2Hr Glucose",
+                "unit": "mg/dL",
+                "min_val": 70.0,
+                "max_val": 140.0
+            }
+        ]
+    },
+    {
+        "id": "MTEST-BILIRUBIN",
+        "name": "Bilirubin",
+        "category": "Liver / Biochemistry",
+        "code": "BILI",
+        "default_price": 200.0,
+        "tube_type": "Serum",
+        "tube_color": "Red",
+        "is_active": true,
+        "parameters": [
+            {
+                "id": "MPARAM-TOTALB",
+                "name": "Total Bilirubin",
+                "unit": "mg/dL",
+                "min_val": 0.1,
+                "max_val": 1.2
+            },
+            {
+                "id": "MPARAM-DIRECT",
+                "name": "Direct Bilirubin",
+                "unit": "mg/dL",
+                "min_val": 0.0,
+                "max_val": 0.3
+            },
+            {
+                "id": "MPARAM-INDIRE",
+                "name": "Indirect Bilirubin",
+                "unit": "mg/dL",
+                "min_val": 0.1,
+                "max_val": 1.0
+            }
+        ]
+    },
+    {
+        "id": "MTEST-UREA",
+        "name": "Urea",
+        "category": "Liver / Biochemistry",
+        "code": "UREA",
+        "default_price": 120.0,
+        "tube_type": "Serum",
+        "tube_color": "Red",
+        "is_active": true,
+        "parameters": [
+            {
+                "id": "MPARAM-BLOODU",
+                "name": "Blood Urea",
+                "unit": "mg/dL",
+                "min_val": 15.0,
+                "max_val": 45.0
+            }
+        ]
+    },
+    {
+        "id": "MTEST-CREATININE",
+        "name": "Creatinine",
+        "category": "Liver / Biochemistry",
+        "code": "CREAT",
+        "default_price": 150.0,
+        "tube_type": "Serum",
+        "tube_color": "Red",
+        "is_active": true,
+        "parameters": [
+            {
+                "id": "MPARAM-SERUMC",
+                "name": "Serum Creatinine",
+                "unit": "mg/dL",
+                "min_val": 0.6,
+                "max_val": 1.2
+            }
+        ]
+    },
+    {
+        "id": "MTEST-URICACID",
+        "name": "Uric Acid",
+        "category": "Liver / Biochemistry",
+        "code": "URIC",
+        "default_price": 150.0,
+        "tube_type": "Serum",
+        "tube_color": "Red",
+        "is_active": true,
+        "parameters": [
+            {
+                "id": "MPARAM-URICAC",
+                "name": "Uric Acid",
+                "unit": "mg/dL",
+                "min_val": 3.5,
+                "max_val": 7.2
+            }
+        ]
+    },
+    {
+        "id": "MTEST-SGOT",
+        "name": "SGOT",
+        "category": "Liver / Biochemistry",
+        "code": "SGOT",
+        "default_price": 150.0,
+        "tube_type": "Serum",
+        "tube_color": "Red",
+        "is_active": true,
+        "parameters": [
+            {
+                "id": "MPARAM-SGOTAS",
+                "name": "SGOT / AST",
+                "unit": "U/L",
+                "min_val": 8.0,
+                "max_val": 48.0
+            }
+        ]
+    },
+    {
+        "id": "MTEST-SGPT",
+        "name": "SGPT",
+        "category": "Liver / Biochemistry",
+        "code": "SGPT",
+        "default_price": 150.0,
+        "tube_type": "Serum",
+        "tube_color": "Red",
+        "is_active": true,
+        "parameters": [
+            {
+                "id": "MPARAM-SGPTAL",
+                "name": "SGPT / ALT",
+                "unit": "U/L",
+                "min_val": 7.0,
+                "max_val": 56.0
+            }
+        ]
+    },
+    {
+        "id": "MTEST-ELECTROLYTES",
+        "name": "Sr. Electrolytes",
+        "category": "Liver / Biochemistry",
+        "code": "ELECT",
+        "default_price": 350.0,
+        "tube_type": "Serum",
+        "tube_color": "Red",
+        "is_active": true,
+        "parameters": [
+            {
+                "id": "MPARAM-SODIUM",
+                "name": "Sodium",
+                "unit": "mmol/L",
+                "min_val": 135.0,
+                "max_val": 145.0
+            },
+            {
+                "id": "MPARAM-POTASS",
+                "name": "Potassium",
+                "unit": "mmol/L",
+                "min_val": 3.5,
+                "max_val": 5.2
+            },
+            {
+                "id": "MPARAM-CHLORI",
+                "name": "Chloride",
+                "unit": "mmol/L",
+                "min_val": 96.0,
+                "max_val": 106.0
+            }
+        ]
+    },
+    {
+        "id": "MTEST-AMYLASE",
+        "name": "Sr. Amylase",
+        "category": "Liver / Biochemistry",
+        "code": "AMY",
+        "default_price": 350.0,
+        "tube_type": "Serum",
+        "tube_color": "Red",
+        "is_active": true,
+        "parameters": [
+            {
+                "id": "MPARAM-SERUMA",
+                "name": "Serum Amylase",
+                "unit": "U/L",
+                "min_val": 25.0,
+                "max_val": 125.0
+            }
+        ]
+    },
+    {
+        "id": "MTEST-LIPASE",
+        "name": "Sr. Lipase",
+        "category": "Liver / Biochemistry",
+        "code": "LIP",
+        "default_price": 400.0,
+        "tube_type": "Serum",
+        "tube_color": "Red",
+        "is_active": true,
+        "parameters": [
+            {
+                "id": "MPARAM-SERUML",
+                "name": "Serum Lipase",
+                "unit": "U/L",
+                "min_val": 10.0,
+                "max_val": 140.0
+            }
+        ]
+    },
+    {
+        "id": "MTEST-PROTEINS",
+        "name": "Sr. Proteins",
+        "category": "Liver / Biochemistry",
+        "code": "PROT",
+        "default_price": 200.0,
+        "tube_type": "Serum",
+        "tube_color": "Red",
+        "is_active": true,
+        "parameters": [
+            {
+                "id": "MPARAM-TOTALP",
+                "name": "Total Protein",
+                "unit": "g/dL",
+                "min_val": 6.0,
+                "max_val": 8.3
+            },
+            {
+                "id": "MPARAM-ALBUMI",
+                "name": "Albumin",
+                "unit": "g/dL",
+                "min_val": 3.5,
+                "max_val": 5.0
+            },
+            {
+                "id": "MPARAM-GLOBUL",
+                "name": "Globulin",
+                "unit": "g/dL",
+                "min_val": 2.0,
+                "max_val": 3.5
+            }
+        ]
+    },
+    {
+        "id": "MTEST-ALBUMIN",
+        "name": "Albumin",
+        "category": "Liver / Biochemistry",
+        "code": "ALB",
+        "default_price": 120.0,
+        "tube_type": "Serum",
+        "tube_color": "Red",
+        "is_active": true,
+        "parameters": [
+            {
+                "id": "MPARAM-ALBUMI",
+                "name": "Albumin",
+                "unit": "g/dL",
+                "min_val": 3.5,
+                "max_val": 5.0
+            }
+        ]
+    },
+    {
+        "id": "MTEST-AGRATIO",
+        "name": "A/G Ratio",
+        "category": "Liver / Biochemistry",
+        "code": "AGR",
+        "default_price": 150.0,
+        "tube_type": "Serum",
+        "tube_color": "Red",
+        "is_active": true,
+        "parameters": [
+            {
+                "id": "MPARAM-ALBUMI",
+                "name": "Albumin Globulin Ratio",
+                "unit": "Ratio",
+                "min_val": 1.1,
+                "max_val": 2.2
+            }
+        ]
+    },
+    {
+        "id": "MTEST-ALP",
+        "name": "Alkaline Phosphatase",
+        "category": "Liver / Biochemistry",
+        "code": "ALP",
+        "default_price": 180.0,
+        "tube_type": "Serum",
+        "tube_color": "Red",
+        "is_active": true,
+        "parameters": [
+            {
+                "id": "MPARAM-ALP",
+                "name": "ALP",
+                "unit": "U/L",
+                "min_val": 44.0,
+                "max_val": 147.0
+            }
+        ]
+    },
+    {
+        "id": "MTEST-CALCIUM",
+        "name": "Calcium",
+        "category": "Liver / Biochemistry",
+        "code": "CA",
+        "default_price": 150.0,
+        "tube_type": "Serum",
+        "tube_color": "Red",
+        "is_active": true,
+        "parameters": [
+            {
+                "id": "MPARAM-TOTALC",
+                "name": "Total Calcium",
+                "unit": "mg/dL",
+                "min_val": 8.5,
+                "max_val": 10.2
+            }
+        ]
+    },
+    {
+        "id": "MTEST-TSH",
+        "name": "TSH",
+        "category": "Hormones / Thyroid",
+        "code": "TSH",
+        "default_price": 250.0,
+        "tube_type": "Serum",
+        "tube_color": "Red",
+        "is_active": true,
+        "parameters": [
+            {
+                "id": "MPARAM-TSH",
+                "name": "TSH",
+                "unit": "uIU/mL",
+                "min_val": 0.4,
+                "max_val": 4.5
+            }
+        ]
+    },
+    {
+        "id": "MTEST-AMH",
+        "name": "AMH",
+        "category": "Hormones / Thyroid",
+        "code": "AMH",
+        "default_price": 1800.0,
+        "tube_type": "Serum",
+        "tube_color": "Red",
+        "is_active": true,
+        "parameters": [
+            {
+                "id": "MPARAM-AMH",
+                "name": "AMH",
+                "unit": "ng/mL",
+                "min_val": 0.7,
+                "max_val": 7.0
+            }
+        ]
+    },
+    {
+        "id": "MTEST-E2",
+        "name": "E2",
+        "category": "Hormones / Thyroid",
+        "code": "E2",
+        "default_price": 650.0,
+        "tube_type": "Serum",
+        "tube_color": "Red",
+        "is_active": true,
+        "parameters": [
+            {
+                "id": "MPARAM-ESTRAD",
+                "name": "Estradiol",
+                "unit": "pg/mL",
+                "min_val": 15.0,
+                "max_val": 350.0
+            }
+        ]
+    },
+    {
+        "id": "MTEST-PROLACTIN",
+        "name": "Prolactine",
+        "category": "Hormones / Thyroid",
+        "code": "PRL",
+        "default_price": 450.0,
+        "tube_type": "Serum",
+        "tube_color": "Red",
+        "is_active": true,
+        "parameters": [
+            {
+                "id": "MPARAM-PROLAC",
+                "name": "Prolactin",
+                "unit": "ng/mL",
+                "min_val": 4.0,
+                "max_val": 23.0
+            }
+        ]
+    },
+    {
+        "id": "MTEST-FSH",
+        "name": "FSH",
+        "category": "Hormones / Thyroid",
+        "code": "FSH",
+        "default_price": 450.0,
+        "tube_type": "Serum",
+        "tube_color": "Red",
+        "is_active": true,
+        "parameters": [
+            {
+                "id": "MPARAM-FSH",
+                "name": "FSH",
+                "unit": "mIU/mL",
+                "min_val": 1.5,
+                "max_val": 12.4
+            }
+        ]
+    },
+    {
+        "id": "MTEST-LH",
+        "name": "LH",
+        "category": "Hormones / Thyroid",
+        "code": "LH",
+        "default_price": 450.0,
+        "tube_type": "Serum",
+        "tube_color": "Red",
+        "is_active": true,
+        "parameters": [
+            {
+                "id": "MPARAM-LH",
+                "name": "LH",
+                "unit": "mIU/mL",
+                "min_val": 1.7,
+                "max_val": 8.6
+            }
+        ]
+    },
+    {
+        "id": "MTEST-HIV",
+        "name": "HIV",
+        "category": "Infection / Immunology",
+        "code": "HIV",
+        "default_price": 300.0,
+        "tube_type": "Serum",
+        "tube_color": "Red",
+        "is_active": true,
+        "parameters": [
+            {
+                "id": "MPARAM-HIVI&I",
+                "name": "HIV I & II Antibody",
+                "unit": "Ratio",
+                "min_val": 0.0,
+                "max_val": 0.9
+            }
+        ]
+    },
+    {
+        "id": "MTEST-HBSAG",
+        "name": "HBSAg",
+        "category": "Infection / Immunology",
+        "code": "HBSAG",
+        "default_price": 250.0,
+        "tube_type": "Serum",
+        "tube_color": "Red",
+        "is_active": true,
+        "parameters": [
+            {
+                "id": "MPARAM-HBSAGA",
+                "name": "HBsAg Antigen",
+                "unit": "Ratio",
+                "min_val": 0.0,
+                "max_val": 0.9
+            }
+        ]
+    },
+    {
+        "id": "MTEST-RA",
+        "name": "RA",
+        "category": "Infection / Immunology",
+        "code": "RA",
+        "default_price": 250.0,
+        "tube_type": "Serum",
+        "tube_color": "Red",
+        "is_active": true,
+        "parameters": [
+            {
+                "id": "MPARAM-RHEUMA",
+                "name": "Rheumatoid Factor",
+                "unit": "IU/mL",
+                "min_val": 0.0,
+                "max_val": 14.0
+            }
+        ]
+    },
+    {
+        "id": "MTEST-ASO",
+        "name": "ASO",
+        "category": "Infection / Immunology",
+        "code": "ASO",
+        "default_price": 300.0,
+        "tube_type": "Serum",
+        "tube_color": "Red",
+        "is_active": true,
+        "parameters": [
+            {
+                "id": "MPARAM-ASOTIT",
+                "name": "ASO Titre",
+                "unit": "IU/mL",
+                "min_val": 0.0,
+                "max_val": 200.0
+            }
+        ]
+    },
+    {
+        "id": "MTEST-CRP",
+        "name": "CRP",
+        "category": "Infection / Immunology",
+        "code": "CRP",
+        "default_price": 300.0,
+        "tube_type": "Serum",
+        "tube_color": "Red",
+        "is_active": true,
+        "parameters": [
+            {
+                "id": "MPARAM-CREACT",
+                "name": "C-Reactive Protein",
+                "unit": "mg/L",
+                "min_val": 0.0,
+                "max_val": 6.0
+            }
+        ]
+    },
+    {
+        "id": "MTEST-URINE",
+        "name": "Urine Examination",
+        "category": "Urine / Stool / Fluid",
+        "code": "URINE",
+        "default_price": 150.0,
+        "tube_type": "Urine Container",
+        "tube_color": "Yellow",
+        "is_active": true,
+        "parameters": [
+            {
+                "id": "MPARAM-URINEP",
+                "name": "Urine pH",
+                "unit": "pH",
+                "min_val": 4.5,
+                "max_val": 8.0
+            },
+            {
+                "id": "MPARAM-SPECGR",
+                "name": "Spec Gravity",
+                "unit": "gravity",
+                "min_val": 1.005,
+                "max_val": 1.03
+            },
+            {
+                "id": "MPARAM-URINES",
+                "name": "Urine Sugar",
+                "unit": "Index",
+                "min_val": 0.0,
+                "max_val": 0.0
+            },
+            {
+                "id": "MPARAM-URINEA",
+                "name": "Urine Albumin",
+                "unit": "Index",
+                "min_val": 0.0,
+                "max_val": 0.0
+            },
+            {
+                "id": "MPARAM-PUSCEL",
+                "name": "Pus Cells",
+                "unit": "/HPF",
+                "min_val": 0.0,
+                "max_val": 5.0
+            },
+            {
+                "id": "MPARAM-EPITHE",
+                "name": "Epithelial Cells",
+                "unit": "/HPF",
+                "min_val": 0.0,
+                "max_val": 5.0
+            }
+        ]
+    },
+    {
+        "id": "MTEST-STOOL",
+        "name": "Stool Examination",
+        "category": "Urine / Stool / Fluid",
+        "code": "STOOL",
+        "default_price": 150.0,
+        "tube_type": "Stool Container",
+        "tube_color": "Blue",
+        "is_active": true,
+        "parameters": [
+            {
+                "id": "MPARAM-STOOLC",
+                "name": "Stool Consistency",
+                "unit": "Text",
+                "min_val": 0.0,
+                "max_val": 0.0
+            },
+            {
+                "id": "MPARAM-STOOLC",
+                "name": "Stool Colour",
+                "unit": "Text",
+                "min_val": 0.0,
+                "max_val": 0.0
+            },
+            {
+                "id": "MPARAM-OVACYS",
+                "name": "Ova/Cysts",
+                "unit": "Presence",
+                "min_val": 0.0,
+                "max_val": 0.0
+            }
+        ]
+    },
+    {
+        "id": "MTEST-FLUID",
+        "name": "Fluid Examination",
+        "category": "Urine / Stool / Fluid",
+        "code": "FLUID",
+        "default_price": 500.0,
+        "tube_type": "Sterile Container",
+        "tube_color": "Red",
+        "is_active": true,
+        "parameters": [
+            {
+                "id": "MPARAM-FLUIDP",
+                "name": "Fluid Protein",
+                "unit": "g/dL",
+                "min_val": 1.0,
+                "max_val": 3.0
+            },
+            {
+                "id": "MPARAM-FLUIDG",
+                "name": "Fluid Glucose",
+                "unit": "mg/dL",
+                "min_val": 70.0,
+                "max_val": 110.0
+            },
+            {
+                "id": "MPARAM-TOTALC",
+                "name": "Total Cells",
+                "unit": "cells/cu.mm",
+                "min_val": 0.0,
+                "max_val": 100.0
+            }
+        ]
+    },
+    {
+        "id": "MTEST-CSF",
+        "name": "CSF",
+        "category": "Urine / Stool / Fluid",
+        "code": "CSF",
+        "default_price": 800.0,
+        "tube_type": "Sterile Container",
+        "tube_color": "Red",
+        "is_active": true,
+        "parameters": [
+            {
+                "id": "MPARAM-CSFPRO",
+                "name": "CSF Protein",
+                "unit": "mg/dL",
+                "min_val": 15.0,
+                "max_val": 45.0
+            },
+            {
+                "id": "MPARAM-CSFGLU",
+                "name": "CSF Glucose",
+                "unit": "mg/dL",
+                "min_val": 50.0,
+                "max_val": 80.0
+            },
+            {
+                "id": "MPARAM-CSFCHL",
+                "name": "CSF Chloride",
+                "unit": "mmol/L",
+                "min_val": 118.0,
+                "max_val": 132.0
+            }
+        ]
+    },
+    {
+        "id": "MTEST-UPT",
+        "name": "Urine Pregnancy Test",
+        "category": "Urine / Stool / Fluid",
+        "code": "UPT",
+        "default_price": 120.0,
+        "tube_type": "Urine Container",
+        "tube_color": "Yellow",
+        "is_active": true,
+        "parameters": [
+            {
+                "id": "MPARAM-HCGPRE",
+                "name": "hCG Pregnancy",
+                "unit": "Presence",
+                "min_val": 0.0,
+                "max_val": 0.0
+            }
+        ]
+    },
+    {
+        "id": "MTEST-LFT",
+        "name": "Liver Function Test (LFT)",
+        "category": "Profiles",
+        "code": "LFT",
+        "default_price": 900.0,
+        "tube_type": "Serum",
+        "tube_color": "Red",
+        "is_active": true,
+        "parameters": [
+            {
+                "id": "MPARAM-BILIT",
+                "name": "Total Bilirubin",
+                "unit": "mg/dL",
+                "min_val": 0.1,
+                "max_val": 1.2
+            },
+            {
+                "id": "MPARAM-DIRECT",
+                "name": "Direct Bilirubin",
+                "unit": "mg/dL",
+                "min_val": 0.0,
+                "max_val": 0.3
+            },
+            {
+                "id": "MPARAM-INDIRE",
+                "name": "Indirect Bilirubin",
+                "unit": "mg/dL",
+                "min_val": 0.1,
+                "max_val": 1.0
+            },
+            {
+                "id": "MPARAM-SGOT",
+                "name": "SGOT / AST",
+                "unit": "U/L",
+                "min_val": 8.0,
+                "max_val": 48.0
+            },
+            {
+                "id": "MPARAM-SGPT",
+                "name": "SGPT / ALT",
+                "unit": "U/L",
+                "min_val": 7.0,
+                "max_val": 56.0
+            },
+            {
+                "id": "MPARAM-ALKALI",
+                "name": "Alkaline Phosphatase",
+                "unit": "U/L",
+                "min_val": 44.0,
+                "max_val": 147.0
+            },
+            {
+                "id": "MPARAM-TOTALP",
+                "name": "Total Protein",
+                "unit": "g/dL",
+                "min_val": 6.0,
+                "max_val": 8.3
+            },
+            {
+                "id": "MPARAM-ALBUMI",
+                "name": "Albumin",
+                "unit": "g/dL",
+                "min_val": 3.5,
+                "max_val": 5.0
+            },
+            {
+                "id": "MPARAM-ALBUMI",
+                "name": "Albumin Globulin Ratio",
+                "unit": "Ratio",
+                "min_val": 1.1,
+                "max_val": 2.2
+            }
+        ]
+    },
+    {
+        "id": "MTEST-LIPID",
+        "name": "Lipid Profile",
+        "category": "Profiles",
+        "code": "LIPID",
+        "default_price": 800.0,
+        "tube_type": "Serum",
+        "tube_color": "Red",
+        "is_active": true,
+        "parameters": [
+            {
+                "id": "MPARAM-CHOL",
+                "name": "Total Cholesterol",
+                "unit": "mg/dL",
+                "min_val": 120.0,
+                "max_val": 200.0
+            },
+            {
+                "id": "MPARAM-TRIG",
+                "name": "Triglycerides",
+                "unit": "mg/dL",
+                "min_val": 50.0,
+                "max_val": 150.0
+            },
+            {
+                "id": "MPARAM-HDL",
+                "name": "HDL Cholesterol",
+                "unit": "mg/dL",
+                "min_val": 40.0,
+                "max_val": 60.0
+            },
+            {
+                "id": "MPARAM-LDL",
+                "name": "LDL Cholesterol",
+                "unit": "mg/dL",
+                "min_val": 50.0,
+                "max_val": 130.0
+            },
+            {
+                "id": "MPARAM-VLDLCH",
+                "name": "VLDL Cholesterol",
+                "unit": "mg/dL",
+                "min_val": 10.0,
+                "max_val": 30.0
+            }
+        ]
+    },
+    {
+        "id": "MTEST-KFT",
+        "name": "KFT",
+        "category": "Profiles",
+        "code": "KFT",
+        "default_price": 700.0,
+        "tube_type": "Serum",
+        "tube_color": "Red",
+        "is_active": true,
+        "parameters": [
+            {
+                "id": "MPARAM-UREA",
+                "name": "Blood Urea",
+                "unit": "mg/dL",
+                "min_val": 15.0,
+                "max_val": 45.0
+            },
+            {
+                "id": "MPARAM-CREAT",
+                "name": "Serum Creatinine",
+                "unit": "mg/dL",
+                "min_val": 0.6,
+                "max_val": 1.2
+            },
+            {
+                "id": "MPARAM-URIC",
+                "name": "Uric Acid",
+                "unit": "mg/dL",
+                "min_val": 3.5,
+                "max_val": 7.2
+            },
+            {
+                "id": "MPARAM-TOTALC",
+                "name": "Total Calcium",
+                "unit": "mg/dL",
+                "min_val": 8.5,
+                "max_val": 10.2
+            }
+        ]
+    },
+    {
+        "id": "MTEST-RENAL",
+        "name": "Renal Profile",
+        "category": "Profiles",
+        "code": "RENAL",
+        "default_price": 750.0,
+        "tube_type": "Serum",
+        "tube_color": "Red",
+        "is_active": true,
+        "parameters": [
+            {
+                "id": "MPARAM-BLOODU",
+                "name": "Blood Urea",
+                "unit": "mg/dL",
+                "min_val": 15.0,
+                "max_val": 45.0
+            },
+            {
+                "id": "MPARAM-SERUMC",
+                "name": "Serum Creatinine",
+                "unit": "mg/dL",
+                "min_val": 0.6,
+                "max_val": 1.2
+            },
+            {
+                "id": "MPARAM-SODIUM",
+                "name": "Sodium",
+                "unit": "mmol/L",
+                "min_val": 135.0,
+                "max_val": 145.0
+            },
+            {
+                "id": "MPARAM-POTASS",
+                "name": "Potassium",
+                "unit": "mmol/L",
+                "min_val": 3.5,
+                "max_val": 5.2
+            },
+            {
+                "id": "MPARAM-CHLORI",
+                "name": "Chloride",
+                "unit": "mmol/L",
+                "min_val": 96.0,
+                "max_val": 106.0
+            }
+        ]
+    },
+    {
+        "id": "MTEST-PREOP",
+        "name": "Pre-Operative Profile",
+        "category": "Profiles",
+        "code": "PREOP",
+        "default_price": 1500.0,
+        "tube_type": "Serum",
+        "tube_color": "Red",
+        "is_active": true,
+        "parameters": [
+            {
+                "id": "MPARAM-HEMOGL",
+                "name": "Hemoglobin",
+                "unit": "g/dL",
+                "min_val": 12.0,
+                "max_val": 17.0
+            },
+            {
+                "id": "MPARAM-BLEEDI",
+                "name": "Bleeding Time",
+                "unit": "mins",
+                "min_val": 1.0,
+                "max_val": 5.0
+            },
+            {
+                "id": "MPARAM-CLOTTI",
+                "name": "Clotting Time",
+                "unit": "mins",
+                "min_val": 3.0,
+                "max_val": 9.0
+            },
+            {
+                "id": "MPARAM-RANDOM",
+                "name": "Random Blood Glucose",
+                "unit": "mg/dL",
+                "min_val": 70.0,
+                "max_val": 140.0
+            },
+            {
+                "id": "MPARAM-HIVI&I",
+                "name": "HIV I & II Antibody",
+                "unit": "Ratio",
+                "min_val": 0.0,
+                "max_val": 0.9
+            },
+            {
+                "id": "MPARAM-HBSAGA",
+                "name": "HBsAg Antigen",
+                "unit": "Ratio",
+                "min_val": 0.0,
+                "max_val": 0.9
+            }
+        ]
+    },
+    {
+        "id": "MTEST-COAG",
+        "name": "Coagulation Profile",
+        "category": "Profiles",
+        "code": "COAG",
+        "default_price": 600.0,
+        "tube_type": "Citrate",
+        "tube_color": "Blue",
+        "is_active": true,
+        "parameters": [
+            {
+                "id": "MPARAM-PROTHR",
+                "name": "Prothrombin Time",
+                "unit": "secs",
+                "min_val": 11.0,
+                "max_val": 15.0
+            },
+            {
+                "id": "MPARAM-INR",
+                "name": "INR",
+                "unit": "Ratio",
+                "min_val": 0.8,
+                "max_val": 1.2
+            },
+            {
+                "id": "MPARAM-PLATEL",
+                "name": "Platelet Count",
+                "unit": "lakhs/mcL",
+                "min_val": 1.5,
+                "max_val": 4.5
+            },
+            {
+                "id": "MPARAM-APTT",
+                "name": "APTT",
+                "unit": "secs",
+                "min_val": 25.0,
+                "max_val": 35.0
+            }
+        ]
+    },
+    {
+        "id": "MTEST-THYROID",
+        "name": "Thyroid Profile",
+        "category": "Profiles",
+        "code": "THYROID",
+        "default_price": 600.0,
+        "tube_type": "Serum",
+        "tube_color": "Red",
+        "is_active": true,
+        "parameters": [
+            {
+                "id": "MPARAM-T3",
+                "name": "Triiodothyronine (T3)",
+                "unit": "ng/dL",
+                "min_val": 80.0,
+                "max_val": 200.0
+            },
+            {
+                "id": "MPARAM-T4",
+                "name": "Thyroxine (T4)",
+                "unit": "mcg/dL",
+                "min_val": 4.5,
+                "max_val": 12.0
+            },
+            {
+                "id": "MPARAM-TSH",
+                "name": "TSH",
+                "unit": "uIU/mL",
+                "min_val": 0.4,
+                "max_val": 4.5
+            }
+        ]
+    },
+    {
+        "id": "MTEST-ANC",
+        "name": "ANC Profile",
+        "category": "Profiles",
+        "code": "ANC",
+        "default_price": 1200.0,
+        "tube_type": "Serum",
+        "tube_color": "Red",
+        "is_active": true,
+        "parameters": [
+            {
+                "id": "MPARAM-HEMOGL",
+                "name": "Hemoglobin",
+                "unit": "g/dL",
+                "min_val": 12.0,
+                "max_val": 17.0
+            },
+            {
+                "id": "MPARAM-ABOGRO",
+                "name": "ABO Grouping",
+                "unit": "Text",
+                "min_val": 0.0,
+                "max_val": 0.0
+            },
+            {
+                "id": "MPARAM-FASTIN",
+                "name": "Fasting Sugar",
+                "unit": "mg/dL",
+                "min_val": 70.0,
+                "max_val": 100.0
+            },
+            {
+                "id": "MPARAM-HIVI&I",
+                "name": "HIV I & II Antibody",
+                "unit": "Ratio",
+                "min_val": 0.0,
+                "max_val": 0.9
+            },
+            {
+                "id": "MPARAM-HBSAGA",
+                "name": "HBsAg Antigen",
+                "unit": "Ratio",
+                "min_val": 0.0,
+                "max_val": 0.9
+            },
+            {
+                "id": "MPARAM-URINEA",
+                "name": "Urine Albumin",
+                "unit": "Index",
+                "min_val": 0.0,
+                "max_val": 0.0
+            }
+        ]
+    },
+    {
+        "id": "MTEST-FNAC",
+        "name": "FNAC",
+        "category": "Pathology / Cytology",
+        "code": "FNAC",
+        "default_price": 750.0,
+        "tube_type": "Aspirate",
+        "tube_color": "N/A",
+        "is_active": true,
+        "parameters": [
+            {
+                "id": "MPARAM-FNACRE",
+                "name": "FNAC Result",
+                "unit": "Text",
+                "min_val": 0.0,
+                "max_val": 0.0
+            }
+        ]
+    },
+    {
+        "id": "MTEST-PAP",
+        "name": "PAP Smear",
+        "category": "Pathology / Cytology",
+        "code": "PAP",
+        "default_price": 600.0,
+        "tube_type": "Smear",
+        "tube_color": "N/A",
+        "is_active": true,
+        "parameters": [
+            {
+                "id": "MPARAM-EPITHE",
+                "name": "Epithelial Cells smear",
+                "unit": "Text",
+                "min_val": 0.0,
+                "max_val": 0.0
+            }
+        ]
+    }
+]
