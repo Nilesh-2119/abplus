@@ -141,29 +141,29 @@ export default function ReportsSection({ labId, currentRole }: ReportsProps) {
                 {labSettings?.logo_base64 ? (
                   <img src={labSettings.logo_base64} alt="Lab Logo" className="h-10 w-auto object-contain mb-2" />
                 ) : (
-                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-cyan-400 to-blue-600 font-syne text-[13px] font-black text-white shadow mb-2">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-cyan-400 to-blue-600 font-syne text-[15px] font-black text-white shadow mb-2">
                     AB+
                   </div>
                 )}
-                <h2 className="text-[15px] font-black text-slate-900 font-syne uppercase tracking-wide">
+                <h2 className="text-[18px] font-black text-slate-900 font-syne uppercase tracking-wide">
                   {labSettings?.name || "AB+ Pathology Laboratory"}
                 </h2>
-                <p className="text-[9px] text-slate-500 font-semibold leading-relaxed max-w-sm">
+                <p className="text-[11px] text-slate-500 font-semibold leading-relaxed max-w-sm">
                   {labSettings?.address || "710, Deccan Gymkhana, Pune, Maharashtra 411004"}
                 </p>
-                <p className="text-[9px] text-slate-400 font-bold">
+                <p className="text-[11px] text-slate-400 font-bold">
                   Phone: {labSettings?.phone || "+91 98765 43210"}
                 </p>
               </div>
               <div className="text-right space-y-1 shrink-0">
-                <span className="text-[10px] font-extrabold text-cyan-600 bg-cyan-50 px-2.5 py-1 rounded-lg border border-cyan-100 uppercase tracking-wider font-mono block">
+                <span className="text-[12px] font-extrabold text-cyan-600 bg-cyan-50 px-2.5 py-1 rounded-lg border border-cyan-100 uppercase tracking-wider font-mono block">
                   Pathology Diagnostics
                 </span>
-                <p className="text-[8px] text-slate-400 font-bold mt-1">Accreditation: ISO 9001:2015</p>
+                <p className="text-[10px] text-slate-400 font-bold mt-1">Accreditation: ISO 9001:2015</p>
               </div>
             </div>
           ) : (
-            <div className="flex justify-between items-center pb-2.5 border-b border-slate-100 text-[8px] font-bold text-slate-400 uppercase tracking-widest">
+            <div className="flex justify-between items-center pb-2.5 border-b border-slate-100 text-[10px] font-bold text-slate-400 uppercase tracking-widest">
               <span>Diagnostic Report</span>
               <span>Confidential</span>
             </div>
@@ -171,10 +171,10 @@ export default function ReportsSection({ labId, currentRole }: ReportsProps) {
 
           {/* Patient Info Grid */}
           <div>
-            <h3 className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-2.5">
+            <h3 className="text-[11px] font-black text-slate-500 uppercase tracking-widest mb-2.5">
               Patient Information
             </h3>
-            <div className="grid grid-cols-2 gap-y-2.5 gap-x-6 p-4 bg-slate-50 border border-slate-100 rounded-xl text-[9px] font-semibold text-slate-600">
+            <div className="grid grid-cols-2 gap-y-2.5 gap-x-6 p-4 bg-slate-50 border border-slate-100 rounded-xl text-[11px] font-semibold text-slate-600">
               <div className="flex justify-between">
                 <span className="text-slate-400">Patient ID</span>
                 <span className="font-mono font-black text-slate-800">{activePatient.id}</span>
@@ -208,7 +208,7 @@ export default function ReportsSection({ labId, currentRole }: ReportsProps) {
 
           {/* Tests overview */}
           <div>
-            <h3 className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-2.5">
+            <h3 className="text-[11px] font-black text-slate-500 uppercase tracking-widest mb-2.5">
               Tests Ordered ({activePatient.tests.length})
             </h3>
             <div className="space-y-1.5">
@@ -219,13 +219,13 @@ export default function ReportsSection({ labId, currentRole }: ReportsProps) {
                   className="w-full flex items-center justify-between p-2.5 bg-white border border-slate-100 hover:border-cyan-200 hover:bg-cyan-50/30 rounded-xl text-left transition-all cursor-pointer group"
                 >
                   <div className="flex items-center gap-2.5">
-                    <span className="h-6 w-6 rounded-lg bg-slate-100 group-hover:bg-cyan-100 flex items-center justify-center text-[9px] font-black text-slate-500 group-hover:text-cyan-600 transition-colors shrink-0">
+                    <span className="h-6 w-6 rounded-lg bg-slate-100 group-hover:bg-cyan-100 flex items-center justify-center text-[11px] font-black text-slate-500 group-hover:text-cyan-600 transition-colors shrink-0">
                       {idx + 1}
                     </span>
-                    <span className="text-[10px] font-bold text-slate-700 group-hover:text-slate-900">{test.name}</span>
+                    <span className="text-[12px] font-bold text-slate-700 group-hover:text-slate-900">{test.name}</span>
                   </div>
                   <div className="flex items-center gap-1.5">
-                    <span className="text-[8px] font-bold text-slate-400">{test.parameters.length} params</span>
+                    <span className="text-[10px] font-bold text-slate-400">{test.parameters.length} params</span>
                     <ChevronRight size={11} className="text-slate-300 group-hover:text-cyan-500 transition-colors" />
                   </div>
                 </button>
@@ -243,19 +243,19 @@ export default function ReportsSection({ labId, currentRole }: ReportsProps) {
           {/* Test Panel Header */}
           <div className="flex items-center justify-between pb-3 border-b-2 border-slate-800">
             <div>
-              <h3 className="text-[13px] font-black text-slate-900 uppercase tracking-wide">{test.name}</h3>
-              <p className="text-[9px] text-slate-400 font-semibold mt-0.5">Report Panel</p>
+              <h3 className="text-[16px] font-black text-slate-900 uppercase tracking-wide">{test.name}</h3>
+              <p className="text-[11px] text-slate-400 font-semibold mt-0.5">Report Panel</p>
             </div>
             <div className="text-right">
-              <span className="text-[9px] font-extrabold text-cyan-600 bg-cyan-50 px-2.5 py-1 rounded-lg border border-cyan-100 uppercase tracking-wider font-mono">
+              <span className="text-[11px] font-extrabold text-cyan-600 bg-cyan-50 px-2.5 py-1 rounded-lg border border-cyan-100 uppercase tracking-wider font-mono">
                 {activePatient.id}
               </span>
-              <p className="text-[8px] text-slate-400 font-bold mt-1">{activePatient.name}</p>
+              <p className="text-[10px] text-slate-400 font-bold mt-1">{activePatient.name}</p>
             </div>
           </div>
 
           {/* Results Table */}
-          <table className="w-full text-left border-collapse text-[9px] font-semibold">
+          <table className="w-full text-left border-collapse text-[11px] font-semibold">
             <thead>
               <tr className="bg-slate-50 border border-slate-100 text-slate-400 font-extrabold uppercase rounded-xl">
                 <th className="py-2.5 px-3 rounded-l-xl w-2/5">Investigation Name</th>
@@ -280,14 +280,14 @@ export default function ReportsSection({ labId, currentRole }: ReportsProps) {
                   >
                     <td className="py-3 px-3 font-bold text-slate-800">{param.name}</td>
                     <td className="py-3 px-3 text-center">
-                      <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg font-black text-[9px] ${
+                      <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg font-black text-[11px] ${
                         isAbnormal
                           ? "text-rose-600 bg-rose-50 border border-rose-200"
                           : "text-emerald-700 bg-emerald-50 border border-emerald-100"
                       }`}>
                         {val !== undefined ? val : "—"}
-                        {isLow && <span className="text-[7px] font-black">↓</span>}
-                        {isHigh && <span className="text-[7px] font-black">↑</span>}
+                        {isLow && <span className="text-[9px] font-black">↓</span>}
+                        {isHigh && <span className="text-[9px] font-black">↑</span>}
                       </span>
                     </td>
                     <td className="py-3 px-3 text-center text-slate-500 font-mono">
@@ -307,7 +307,7 @@ export default function ReportsSection({ labId, currentRole }: ReportsProps) {
           }) && (
             <div className="flex items-start gap-2 p-2.5 bg-rose-50/60 border border-rose-100 rounded-xl">
               <AlertCircle size={12} className="text-rose-400 mt-0.5 shrink-0" />
-              <p className="text-[9px] text-rose-600 font-semibold">
+              <p className="text-[11px] text-rose-600 font-semibold">
                 One or more values are outside the reference range. Please consult your physician.
               </p>
             </div>
@@ -321,11 +321,11 @@ export default function ReportsSection({ labId, currentRole }: ReportsProps) {
         <div className="space-y-6">
           {/* Summary */}
           <div className="pb-4 border-b border-slate-200">
-            <h3 className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-3">Summary</h3>
+            <h3 className="text-[11px] font-black text-slate-500 uppercase tracking-widest mb-3">Summary</h3>
             <div className="grid grid-cols-3 gap-2 text-center">
               <div className="bg-slate-50 border border-slate-100 rounded-xl p-3">
                 <span className="text-lg font-black text-slate-800">{activePatient.tests.length}</span>
-                <p className="text-[8px] font-bold text-slate-400 mt-0.5">Tests Ordered</p>
+                <p className="text-[10px] font-bold text-slate-400 mt-0.5">Tests Ordered</p>
               </div>
               <div className="bg-emerald-50 border border-emerald-100 rounded-xl p-3">
                 <span className="text-lg font-black text-emerald-600">
@@ -334,7 +334,7 @@ export default function ReportsSection({ labId, currentRole }: ReportsProps) {
                     return getParamFlag(v, p.min_val, p.max_val) === "NORMAL";
                   }).length, 0)}
                 </span>
-                <p className="text-[8px] font-bold text-emerald-500 mt-0.5">Normal Values</p>
+                <p className="text-[10px] font-bold text-emerald-500 mt-0.5">Normal Values</p>
               </div>
               <div className="bg-rose-50 border border-rose-100 rounded-xl p-3">
                 <span className="text-lg font-black text-rose-600">
@@ -344,33 +344,33 @@ export default function ReportsSection({ labId, currentRole }: ReportsProps) {
                     return f === "LOW" || f === "HIGH";
                   }).length, 0)}
                 </span>
-                <p className="text-[8px] font-bold text-rose-400 mt-0.5">Abnormal Values</p>
+                <p className="text-[10px] font-bold text-rose-400 mt-0.5">Abnormal Values</p>
               </div>
             </div>
           </div>
 
           {/* Doctor sign-off */}
           <div className="flex justify-between items-end gap-6">
-            <div className="text-[8px] font-bold text-slate-400 space-y-1">
-              <span className="block font-mono font-black text-slate-800 text-[9px]">BARCODE STAMP</span>
+            <div className="text-[10px] font-bold text-slate-400 space-y-1">
+              <span className="block font-mono font-black text-slate-800 text-[11px]">BARCODE STAMP</span>
               <span className="block">Diagnostic System Validation</span>
               <span className="block font-mono text-slate-300">{activePatient.id}</span>
             </div>
             <div className="text-right space-y-1.5">
-              <div className="h-10 w-32 bg-slate-50 border border-dashed border-slate-200 flex items-center justify-center rounded-lg text-[7px] text-slate-300 font-extrabold uppercase italic select-none ml-auto">
+              <div className="h-10 w-32 bg-slate-50 border border-dashed border-slate-200 flex items-center justify-center rounded-lg text-[9px] text-slate-300 font-extrabold uppercase italic select-none ml-auto">
                 Signature
               </div>
-              <span className="block text-[9px] text-slate-800 font-black">Dr. Rajesh Sharma, MD</span>
-              <span className="block text-[7px] text-slate-400 font-semibold">Pathologist & Lab Director</span>
+              <span className="block text-[11px] text-slate-800 font-black">Dr. Rajesh Sharma, MD</span>
+              <span className="block text-[9px] text-slate-400 font-semibold">Pathologist & Lab Director</span>
             </div>
           </div>
 
           {/* Footer note */}
           <div className="pt-4 border-t border-slate-100 text-center">
-            <p className="text-[8px] text-slate-400 font-semibold">
+            <p className="text-[10px] text-slate-400 font-semibold">
               This report is generated electronically and is valid without signature when digitally authenticated.
             </p>
-            <p className="text-[8px] text-slate-300 font-semibold mt-0.5">
+            <p className="text-[10px] text-slate-300 font-semibold mt-0.5">
               {labSettings?.name || "AB+ Pathology"} • {labSettings?.address || "Pune, Maharashtra"}
             </p>
           </div>
@@ -437,7 +437,7 @@ export default function ReportsSection({ labId, currentRole }: ReportsProps) {
         }
         @media screen {
           .preview-page-card {
-            zoom: 0.8;
+            zoom: 0.9;
           }
         }
       `}</style>
@@ -592,41 +592,41 @@ export default function ReportsSection({ labId, currentRole }: ReportsProps) {
                                     {labSettings?.logo_base64 ? (
                                       <img src={labSettings.logo_base64} alt="Lab Logo" className="h-8 w-auto object-contain mb-1" />
                                     ) : (
-                                      <div className="flex h-8 w-8 items-center justify-center rounded bg-gradient-to-br from-cyan-400 to-blue-600 font-syne text-[11px] font-black text-white shadow mb-1">
+                                      <div className="flex h-8 w-8 items-center justify-center rounded bg-gradient-to-br from-cyan-400 to-blue-600 font-syne text-[13px] font-black text-white shadow mb-1">
                                         AB+
                                       </div>
                                     )}
-                                    <h2 className="text-[13px] font-black text-slate-900 font-syne uppercase tracking-wide">
+                                    <h2 className="text-[16px] font-black text-slate-900 font-syne uppercase tracking-wide">
                                       {labSettings?.name || "AB+ Pathology Laboratory"}
                                     </h2>
-                                    <p className="text-[8px] text-slate-500 font-semibold leading-relaxed max-w-sm">
+                                    <p className="text-[10px] text-slate-500 font-semibold leading-relaxed max-w-sm">
                                       {labSettings?.address}
                                     </p>
-                                    <p className="text-[8px] text-slate-400 font-bold">
+                                    <p className="text-[10px] text-slate-400 font-bold">
                                       Phone: {labSettings?.phone}
                                     </p>
                                   </div>
                                   <div className="text-right space-y-0.5">
-                                    <span className="text-[9px] font-extrabold text-cyan-600 bg-cyan-50 px-2 py-0.5 rounded border uppercase tracking-wider font-mono">
+                                    <span className="text-[11px] font-extrabold text-cyan-600 bg-cyan-50 px-2 py-0.5 rounded border uppercase tracking-wider font-mono">
                                       Pathology Diagnostics
                                     </span>
-                                    <p className="text-[7px] text-slate-400 font-bold mt-1">Accreditation: ISO 9001:2015</p>
+                                    <p className="text-[9px] text-slate-400 font-bold mt-1">Accreditation: ISO 9001:2015</p>
                                   </div>
                                 </div>
                               )}
 
                               {useLetterhead && labSettings?.letterhead_base64 && (
-                                <div className="text-right text-[8px] font-bold text-slate-400 uppercase tracking-widest pb-2 border-b border-slate-100 mb-4">
+                                <div className="text-right text-[10px] font-bold text-slate-400 uppercase tracking-widest pb-2 border-b border-slate-100 mb-4">
                                   Diagnostic Report
                                 </div>
                               )}
 
                               {/* Patient Info Grid */}
                               <div>
-                                <h3 className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-2.5">
+                                <h3 className="text-[11px] font-black text-slate-500 uppercase tracking-widest mb-2.5">
                                   Patient Information
                                 </h3>
-                                <div className="grid grid-cols-2 gap-y-2.5 gap-x-6 p-4 bg-slate-50 border border-slate-100 rounded-xl text-[9px] font-semibold text-slate-600">
+                                <div className="grid grid-cols-2 gap-y-2.5 gap-x-6 p-4 bg-slate-50 border border-slate-100 rounded-xl text-[11px] font-semibold text-slate-600">
                                   <div className="flex justify-between">
                                     <span className="text-slate-400">Patient ID:</span>
                                     <span className="font-mono font-black text-slate-800">{activePatient.id}</span>
@@ -656,12 +656,12 @@ export default function ReportsSection({ labId, currentRole }: ReportsProps) {
 
                               {/* Tests list */}
                               <div>
-                                <h3 className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-2.5">
+                                <h3 className="text-[11px] font-black text-slate-500 uppercase tracking-widest mb-2.5">
                                   Tests Ordered & Diagnostic Status
                                 </h3>
                                 <div className="border border-slate-100 rounded-xl overflow-hidden divide-y divide-slate-100">
                                   {activePatient.tests.map((test, testIdx) => (
-                                    <div key={test.id} className="flex items-center justify-between p-3 bg-white text-[9px] font-semibold">
+                                    <div key={test.id} className="flex items-center justify-between p-3 bg-white text-[11px] font-semibold">
                                       <div className="flex items-center gap-2">
                                         <span className="h-5 w-5 rounded bg-slate-100 flex items-center justify-center font-black text-slate-500">
                                           {testIdx + 1}
@@ -682,18 +682,18 @@ export default function ReportsSection({ labId, currentRole }: ReportsProps) {
                               <div className="space-y-4">
                                 <div className="flex items-center justify-between pb-2.5 border-b-2 border-slate-800">
                                   <div>
-                                    <h3 className="text-[12px] font-black text-slate-900 uppercase tracking-wide">{test.name}</h3>
-                                    <p className="text-[8px] text-slate-400 font-semibold mt-0.5">Report Panel</p>
+                                    <h3 className="text-[15px] font-black text-slate-900 uppercase tracking-wide">{test.name}</h3>
+                                    <p className="text-[10px] text-slate-400 font-semibold mt-0.5">Report Panel</p>
                                   </div>
                                   <div className="text-right">
-                                    <span className="text-[8px] font-extrabold text-cyan-600 bg-cyan-50 px-2 py-0.5 rounded border uppercase tracking-wider font-mono">
+                                    <span className="text-[10px] font-extrabold text-cyan-600 bg-cyan-50 px-2 py-0.5 rounded border uppercase tracking-wider font-mono">
                                       {activePatient.id}
                                     </span>
-                                    <p className="text-[8px] text-slate-400 font-bold mt-1">{activePatient.name}</p>
+                                    <p className="text-[10px] text-slate-400 font-bold mt-1">{activePatient.name}</p>
                                   </div>
                                 </div>
 
-                                <table className="w-full text-left border-collapse text-[9px] font-semibold">
+                                <table className="w-full text-left border-collapse text-[11px] font-semibold">
                                   <thead>
                                     <tr className="bg-slate-50 border border-slate-100 text-slate-400 font-extrabold uppercase">
                                       <th className="py-2 px-3 w-2/5">Investigation Name</th>
@@ -718,7 +718,7 @@ export default function ReportsSection({ labId, currentRole }: ReportsProps) {
                                         >
                                           <td className="py-2.5 px-3 font-bold text-slate-800">{param.name}</td>
                                           <td className="py-2.5 px-3 text-center">
-                                            <span className={`inline-flex items-center gap-0.5 px-2 py-0.5 rounded font-black text-[9px] ${
+                                            <span className={`inline-flex items-center gap-0.5 px-2 py-0.5 rounded font-black text-[11px] ${
                                               isAbnormal ? "text-rose-600 bg-rose-50 border border-rose-100" : "text-slate-800"
                                             }`}>
                                               {val !== undefined ? val : "Awaiting Lab"}
@@ -740,11 +740,11 @@ export default function ReportsSection({ labId, currentRole }: ReportsProps) {
                           {page.type === "footer" && (
                             <div className="space-y-6">
                               <div className="pb-4 border-b border-slate-200">
-                                <h3 className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-3">Diagnostic Summary</h3>
+                                <h3 className="text-[11px] font-black text-slate-500 uppercase tracking-widest mb-3">Diagnostic Summary</h3>
                                 <div className="grid grid-cols-3 gap-2 text-center">
                                   <div className="bg-slate-50 border border-slate-100 rounded-xl p-3">
                                     <span className="text-lg font-black text-slate-800">{activePatient.tests.length}</span>
-                                    <p className="text-[8px] font-bold text-slate-400 mt-0.5">Tests Ordered</p>
+                                    <p className="text-[10px] font-bold text-slate-400 mt-0.5">Tests Ordered</p>
                                   </div>
                                   <div className="bg-emerald-50 border border-emerald-100 rounded-xl p-3">
                                     <span className="text-lg font-black text-emerald-600">
@@ -753,7 +753,7 @@ export default function ReportsSection({ labId, currentRole }: ReportsProps) {
                                         return getParamFlag(v, p.min_val, p.max_val) === "NORMAL";
                                       }).length, 0)}
                                     </span>
-                                    <p className="text-[8px] font-bold text-emerald-500 mt-0.5">Normal Values</p>
+                                    <p className="text-[10px] font-bold text-emerald-500 mt-0.5">Normal Values</p>
                                   </div>
                                   <div className="bg-rose-50 border border-rose-100 rounded-xl p-3">
                                     <span className="text-lg font-black text-rose-600">
@@ -763,31 +763,31 @@ export default function ReportsSection({ labId, currentRole }: ReportsProps) {
                                         return f === "LOW" || f === "HIGH";
                                       }).length, 0)}
                                     </span>
-                                    <p className="text-[8px] font-bold text-rose-400 mt-0.5">Abnormal Values</p>
+                                    <p className="text-[10px] font-bold text-rose-400 mt-0.5">Abnormal Values</p>
                                   </div>
                                 </div>
                               </div>
 
                               <div className="flex justify-between items-end gap-6 pt-4">
-                                <div className="text-[8px] font-bold text-slate-400 space-y-1">
-                                  <span className="block font-mono font-black text-slate-800 text-[9px]">BARCODE STAMP</span>
+                                <div className="text-[10px] font-bold text-slate-400 space-y-1">
+                                  <span className="block font-mono font-black text-slate-800 text-[11px]">BARCODE STAMP</span>
                                   <span className="block">Diagnostic System Validation</span>
                                   <span className="block font-mono text-slate-300">{activePatient.id}</span>
                                 </div>
                                 <div className="text-right space-y-1">
-                                  <div className="h-10 w-32 bg-slate-50 border border-dashed border-slate-200 flex items-center justify-center rounded-lg text-[7px] text-slate-300 font-extrabold uppercase italic ml-auto select-none">
+                                  <div className="h-10 w-32 bg-slate-50 border border-dashed border-slate-200 flex items-center justify-center rounded-lg text-[9px] text-slate-300 font-extrabold uppercase italic ml-auto select-none">
                                     Signature
                                   </div>
-                                  <span className="block text-[9px] text-slate-800 font-black">Dr. Rajesh Sharma, MD</span>
-                                  <span className="block text-[7px] text-slate-400 font-semibold">Pathologist & Lab Director</span>
+                                  <span className="block text-[11px] text-slate-800 font-black">Dr. Rajesh Sharma, MD</span>
+                                  <span className="block text-[9px] text-slate-400 font-semibold">Pathologist & Lab Director</span>
                                 </div>
                               </div>
 
                               <div className="pt-6 border-t border-slate-100 text-center space-y-1">
-                                <p className="text-[8px] text-slate-400 font-semibold">
+                                <p className="text-[10px] text-slate-400 font-semibold">
                                   This report is generated electronically and is valid without signature when digitally authenticated.
                                 </p>
-                                <p className="text-[7px] text-slate-300">
+                                <p className="text-[9px] text-slate-300">
                                   {labSettings?.name} • {labSettings?.address}
                                 </p>
                               </div>
@@ -796,7 +796,7 @@ export default function ReportsSection({ labId, currentRole }: ReportsProps) {
                         </div>
 
                         {/* Page Footer */}
-                        <div className="flex justify-between items-center text-[8px] font-bold text-slate-400 uppercase tracking-wider border-t border-slate-100 pt-2 shrink-0">
+                        <div className="flex justify-between items-center text-[10px] font-bold text-slate-400 uppercase tracking-wider border-t border-slate-100 pt-2 shrink-0">
                           <span>{activePatient.name} ({activePatient.id})</span>
                           <span>Page {idx + 1} of {totalPages}</span>
                         </div>
@@ -858,7 +858,7 @@ export default function ReportsSection({ labId, currentRole }: ReportsProps) {
                         <div className="flex-1">
                           {renderPageContent(pageIdx)}
                         </div>
-                        <div className="flex justify-between items-center text-[8px] font-bold text-slate-400 uppercase tracking-wider border-t border-slate-100 pt-2 shrink-0 mt-4">
+                        <div className="flex justify-between items-center text-[10px] font-bold text-slate-400 uppercase tracking-wider border-t border-slate-100 pt-2 shrink-0 mt-4">
                           <span>{activePatient.name} ({activePatient.id})</span>
                           <span>Page {pageIdx + 1} of {totalPages}</span>
                         </div>
