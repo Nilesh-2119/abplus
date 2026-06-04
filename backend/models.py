@@ -236,7 +236,7 @@ class MasterTest(SoftDeleteModel):
     created_at = models.DateTimeField(auto_now_add=True, db_index=True)
 
     class Meta:
-        db_table = 'master_tests'
+        db_table = 'master_test_library'
         ordering = ['category', 'name']
 
     def __str__(self):
@@ -296,20 +296,49 @@ class LabTest(SoftDeleteModel):
         related_name='lab_tests',
         db_column='master_test_id'
     )
-    name = models.CharField(max_length=255)
-    category = models.CharField(max_length=100, db_index=True)
-    code = models.CharField(max_length=50, blank=True, default="")
+    test_name = models.CharField(max_length=255)
     price = models.DecimalField(max_digits=10, decimal_places=2)
-    tube_type = models.CharField(max_length=100)
-    tube_color = models.CharField(max_length=100)
-    is_enabled = models.BooleanField(default=True, db_index=True)
-    is_custom = models.BooleanField(default=False)
     commission_percentage = models.DecimalField(max_digits=5, decimal_places=2, default=50.00)
+    tube_type = models.CharField(max_length=100)
+    normal_range = models.TextField(blank=True, default="")
+    is_active = models.BooleanField(default=True, db_index=True)
     created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    # Legacy fields kept for code compatibility
+    category = models.CharField(max_length=100, db_index=True, blank=True, default="General")
+    code = models.CharField(max_length=50, blank=True, default="")
+    tube_color = models.CharField(max_length=100, blank=True, default="Red")
+    is_custom = models.BooleanField(default=False)
+
+    def __init__(self, *args, **kwargs):
+        # Support both 'name' and 'test_name'
+        if 'name' in kwargs and 'test_name' not in kwargs:
+            kwargs['test_name'] = kwargs.pop('name')
+        # Support both 'is_enabled' and 'is_active'
+        if 'is_enabled' in kwargs and 'is_active' not in kwargs:
+            kwargs['is_active'] = kwargs.pop('is_enabled')
+        super().__init__(*args, **kwargs)
+
+    @property
+    def name(self):
+        return self.test_name
+
+    @name.setter
+    def name(self, value):
+        self.test_name = value
+
+    @property
+    def is_enabled(self):
+        return self.is_active
+
+    @is_enabled.setter
+    def is_enabled(self, value):
+        self.is_active = value
 
     class Meta:
         db_table = 'lab_tests'
-        ordering = ['category', 'name']
+        ordering = ['category', 'test_name']
         unique_together = ('lab', 'code')
 
     def __str__(self):

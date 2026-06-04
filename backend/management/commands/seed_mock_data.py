@@ -132,13 +132,13 @@ class Command(BaseCommand):
                 l_test = LabTest.objects.create(
                     lab=lab,
                     master_test=m_test,
-                    name=m_test.name,
+                    test_name=m_test.name,
                     category=m_test.category,
                     code=m_test.code,
                     price=m_test.default_price,
                     tube_type=m_test.tube_type,
                     tube_color=m_test.tube_color,
-                    is_enabled=True,
+                    is_active=True,
                     is_custom=False
                 )
                 for m_param in m_test.parameters.all():

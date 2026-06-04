@@ -701,17 +701,21 @@ class TestViewSet(SoftDeleteViewSetMixin, viewsets.ModelViewSet):
         category = self.request.query_params.get('category')
         queryset = LabTest.objects.all().prefetch_related('parameters')
         
+        # Enforce strict lab_id filtering
+        lab_id = None
         if self.request.user.is_authenticated:
             if self.request.user.role != 'SUPER_ADMIN' and not self.request.user.is_superuser:
-                queryset = queryset.filter(lab=self.request.user.lab)
+                lab_id = self.request.user.lab_id
             else:
-                lab_id = self.request.query_params.get('lab_id')
-                if lab_id:
-                    queryset = queryset.filter(lab_id=lab_id)
+                lab_id = self.request.query_params.get('lab_id') or (self.request.user.lab_id if self.request.user.lab_id else None)
         else:
             lab_id = self.request.query_params.get('lab_id')
-            if lab_id:
-                queryset = queryset.filter(lab_id=lab_id)
+
+        # If no lab_id could be determined, return empty to prevent data leak
+        if not lab_id:
+            return LabTest.objects.none()
+            
+        queryset = queryset.filter(lab_id=lab_id)
                 
         if category:
             queryset = queryset.filter(category=category)
@@ -721,8 +725,8 @@ class TestViewSet(SoftDeleteViewSetMixin, viewsets.ModelViewSet):
     @action(detail=True, methods=['patch'], url_path='toggle')
     def toggle(self, request, pk=None):
         test = self.get_object()
-        is_enabled = request.data.get('is_enabled', True)
-        test.is_enabled = is_enabled
+        is_enabled = request.data.get('is_enabled', request.data.get('is_active', True))
+        test.is_active = is_enabled
         test.save()
 
         # Log action

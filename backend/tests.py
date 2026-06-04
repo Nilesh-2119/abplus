@@ -611,3 +611,129 @@ class CashFlowArchitectureTests(TestCase):
         self.assertEqual(data_04_re['net_cash_in_hand'], 1450.0)
 
 
+class MultiTenantTestIsolationTests(TestCase):
+    def setUp(self):
+        from backend.models import Lab, MasterTest, LabTest
+        # 1. Create two labs
+        self.lab_a = Lab.objects.create(id="LAB-A", name="Lab A", status="active")
+        self.lab_b = Lab.objects.create(id="LAB-B", name="Lab B", status="active")
+
+        # 2. Create global master tests templates
+        self.master_cbc = MasterTest.objects.create(
+            id="M-CBC",
+            name="Complete Blood Count",
+            category="Hematology",
+            code="CBC",
+            default_price=Decimal("300.00"),
+            tube_type="EDTA",
+            tube_color="Purple",
+            is_active=True
+        )
+        self.master_tsh = MasterTest.objects.create(
+            id="M-TSH",
+            name="Thyroid Stimulating Hormone",
+            category="Biochemistry",
+            code="TSH",
+            default_price=Decimal("400.00"),
+            tube_type="Serum",
+            tube_color="Red",
+            is_active=True
+        )
+
+        # 3. Onboard both labs - this will copy master tests to lab_tests
+        for lab in [self.lab_a, self.lab_b]:
+            for m_test in [self.master_cbc, self.master_tsh]:
+                LabTest.objects.create(
+                    lab=lab,
+                    master_test=m_test,
+                    test_name=m_test.name,
+                    category=m_test.category,
+                    code=m_test.code,
+                    price=m_test.default_price,
+                    tube_type=m_test.tube_type,
+                    tube_color=m_test.tube_color,
+                    is_active=True,
+                    is_custom=False
+                )
+
+        # Retrieve lab specific copies
+        self.cbc_a = LabTest.objects.get(lab=self.lab_a, code="CBC")
+        self.cbc_b = LabTest.objects.get(lab=self.lab_b, code="CBC")
+        self.tsh_a = LabTest.objects.get(lab=self.lab_a, code="TSH")
+        self.tsh_b = LabTest.objects.get(lab=self.lab_b, code="TSH")
+
+    def test_independent_test_records_and_edits(self):
+        """
+        Verify that changing test properties (e.g. price) in Lab A does not affect Lab B.
+        """
+        # Change Lab A price
+        self.cbc_a.price = Decimal("350.00")
+        self.cbc_a.save()
+
+        # Refresh and check
+        self.cbc_a.refresh_from_db()
+        self.cbc_b.refresh_from_db()
+        self.assertEqual(self.cbc_a.price, Decimal("350.00"))
+        self.assertEqual(self.cbc_b.price, Decimal("300.00"))
+
+    def test_independent_test_disabling(self):
+        """
+        Verify that disabling a test in Lab A does not disable it in Lab B.
+        """
+        # Disable Lab A test
+        self.tsh_a.is_active = False
+        self.tsh_a.save()
+
+        # Check status
+        self.tsh_a.refresh_from_db()
+        self.tsh_b.refresh_from_db()
+        self.assertFalse(self.tsh_a.is_active)
+        self.assertTrue(self.tsh_b.is_active)
+
+    def test_independent_test_deletion(self):
+        """
+        Verify that soft deleting a test in Lab A does not delete it in Lab B.
+        """
+        # Delete Lab A test
+        self.cbc_a.delete()
+
+        # Check filtering (using default manager)
+        self.assertFalse(LabTest.objects.filter(lab=self.lab_a, code="CBC").exists())
+        self.assertTrue(LabTest.objects.filter(lab=self.lab_b, code="CBC").exists())
+
+    def test_patient_registration_isolation(self):
+        """
+        Verify that registering a patient in Lab A filters out and does not associate tests from Lab B.
+        """
+        from backend.serializers import PatientEntrySerializer
+        from django.contrib.auth import get_user_model
+        User = get_user_model()
+        user_a = User.objects.create_user(
+            username="admin_a",
+            password="password123",
+            role="LAB_ADMIN",
+            lab=self.lab_a,
+            email="admin_a@alphalab.com"
+        )
+        
+        # Try to register a patient in Lab A, but pass a test ID belonging to Lab B (cbc_b.id)
+        serializer = PatientEntrySerializer(data={
+            "name": "Jane Doe",
+            "age": 28,
+            "gender": "Female",
+            "phone": "9876543210",
+            "tests": [self.cbc_a.id, self.cbc_b.id],
+            "lab_id": self.lab_a.id,
+            "total_bill": "300.00"
+        })
+        self.assertTrue(serializer.is_valid(), serializer.errors)
+        
+        # Save and verify
+        patient = serializer.save(created_by=user_a, lab=self.lab_a)
+        
+        # Only cbc_a must be associated with the patient, NOT cbc_b!
+        patient_tests = patient.tests.all()
+        self.assertIn(self.cbc_a, patient_tests)
+        self.assertNotIn(self.cbc_b, patient_tests)
+
+

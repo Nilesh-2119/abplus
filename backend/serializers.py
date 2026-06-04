@@ -176,13 +176,13 @@ class LabCreateSerializer(serializers.Serializer):
                 lab_test = LabTest.objects.create(
                     lab=lab,
                     master_test=m_test,
-                    name=m_test.name,
+                    test_name=m_test.name,
                     category=m_test.category,
                     code=m_test.code,
                     price=m_test.default_price,
                     tube_type=m_test.tube_type,
                     tube_color=m_test.tube_color,
-                    is_enabled=True,
+                    is_active=True,
                     is_custom=False
                 )
                 for m_param in m_test.parameters.all():
@@ -347,10 +347,19 @@ class LabTestParameterSerializer(serializers.ModelSerializer):
 class LabTestSerializer(serializers.ModelSerializer):
     parameters = LabTestParameterSerializer(many=True, required=False)
     lab_id = serializers.CharField(write_only=True, required=False)
+    name = serializers.CharField(source='test_name', required=False)
+    test_name = serializers.CharField(required=False)
+    is_enabled = serializers.BooleanField(source='is_active', required=False)
+    is_active = serializers.BooleanField(required=False)
+    normal_range = serializers.CharField(required=False, allow_blank=True)
 
     class Meta:
         model = LabTest
-        fields = ['id', 'name', 'category', 'code', 'price', 'tube_type', 'tube_color', 'is_enabled', 'is_custom', 'commission_percentage', 'parameters', 'lab_id', 'master_test_id']
+        fields = [
+            'id', 'name', 'test_name', 'category', 'code', 'price', 'tube_type', 'tube_color', 
+            'is_enabled', 'is_active', 'is_custom', 'commission_percentage', 'parameters', 
+            'lab_id', 'master_test_id', 'normal_range'
+        ]
 
     def validate_commission_percentage(self, value):
         if value < 0 or value > 100:
@@ -359,10 +368,26 @@ class LabTestSerializer(serializers.ModelSerializer):
 
     def create(self, validated_data):
         parameters_data = validated_data.pop('parameters', [])
-        lab_id = validated_data.pop('lab_id', None)
-        if lab_id:
-            validated_data['lab'] = Lab.objects.get(id=lab_id)
         
+        request = self.context.get('request')
+        lab_id = validated_data.pop('lab_id', None)
+        lab = None
+        if lab_id:
+            lab = Lab.objects.get(id=lab_id)
+        elif request and request.user.is_authenticated and request.user.lab:
+            lab = request.user.lab
+            
+        if not lab:
+            raise serializers.ValidationError({"lab_id": "Lab context is required to create a test."})
+            
+        validated_data['lab'] = lab
+        
+        # Fallback values
+        if 'test_name' not in validated_data and 'name' in self.initial_data:
+            validated_data['test_name'] = self.initial_data['name']
+        if 'is_active' not in validated_data and 'is_enabled' in self.initial_data:
+            validated_data['is_active'] = self.initial_data['is_enabled']
+
         test = LabTest.objects.create(**validated_data)
         for param_data in parameters_data:
             LabTestParameter.objects.create(lab_test=test, **param_data)
@@ -374,15 +399,16 @@ class LabTestSerializer(serializers.ModelSerializer):
         if lab_id:
             instance.lab = Lab.objects.get(id=lab_id)
             
-        instance.name = validated_data.get('name', instance.name)
+        instance.test_name = validated_data.get('test_name', validated_data.get('name', instance.test_name))
         instance.category = validated_data.get('category', instance.category)
         instance.code = validated_data.get('code', instance.code)
         instance.price = validated_data.get('price', instance.price)
         instance.tube_type = validated_data.get('tube_type', instance.tube_type)
         instance.tube_color = validated_data.get('tube_color', instance.tube_color)
-        instance.is_enabled = validated_data.get('is_enabled', instance.is_enabled)
+        instance.is_active = validated_data.get('is_active', validated_data.get('is_enabled', instance.is_active))
         instance.is_custom = validated_data.get('is_custom', instance.is_custom)
         instance.commission_percentage = validated_data.get('commission_percentage', instance.commission_percentage)
+        instance.normal_range = validated_data.get('normal_range', instance.normal_range)
         instance.save()
 
         if parameters_data is not None:
@@ -558,7 +584,7 @@ class PatientEntrySerializer(serializers.ModelSerializer):
 
         patient = PatientEntry.objects.create(**validated_data)
         if test_ids:
-            patient.tests.set(LabTest.objects.filter(id__in=test_ids))
+            patient.tests.set(LabTest.objects.filter(id__in=test_ids, lab=patient.lab))
 
         # If there is initial payment or concession, create a PaymentTransaction record
         if float(paid_amount_val) > 0.0 or float(concession_val) > 0.0:
@@ -642,7 +668,7 @@ class PatientEntrySerializer(serializers.ModelSerializer):
                     test_ids.append(test.get('id'))
                 else:
                     test_ids.append(test)
-            instance.tests.set(LabTest.objects.filter(id__in=test_ids))
+            instance.tests.set(LabTest.objects.filter(id__in=test_ids, lab=instance.lab))
 
         # If a difference exists, record the change as a new PaymentTransaction
         if abs(diff_paid) > 0.009 or abs(diff_conc) > 0.009:
