@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { apiService } from "@/services/api";
+import { useIntervalRefetch } from "@/hooks/useIntervalRefetch";
 import {
   FileText,
   Calendar,
@@ -59,30 +60,30 @@ export default function InformativeReports({ labId, currentRole }: InformativeRe
   // Validation States
   const [validationError, setValidationError] = useState<string>("");
 
-  // 1. Load available reports & filter dropdown items
-  useEffect(() => {
-    async function loadInitialData() {
-      setLoading(true);
-      try {
-        // Fetch reports list from API
-        const reportsList = await apiService.getInformativeReportsList();
-        setReports(reportsList);
-        if (reportsList.length > 0) {
-          setActiveReportId(reportsList[0].id);
-        }
+  const loadInitialData = async (isBackground = false) => {
+    if (!isBackground) setLoading(true);
+    try {
+      // Fetch reports list from API
+      const reportsList = await apiService.getInformativeReportsList();
+      setReports(reportsList);
+      if (reportsList.length > 0 && !activeReportId) {
+        setActiveReportId(reportsList[0].id);
+      }
 
-        // Fetch dropdown options in parallel
-        const [doctorsList, testsList, employeesList] = await Promise.all([
-          apiService.getReferredDoctors(labId),
-          apiService.getTests(labId),
-          apiService.getEmployees(labId)
-        ]);
+      // Fetch dropdown options in parallel
+      const [doctorsList, testsList, employeesList] = await Promise.all([
+        apiService.getReferredDoctors(labId),
+        apiService.getTests(labId),
+        apiService.getEmployees(labId)
+      ]);
 
-        setDoctors(doctorsList);
-        setTests(testsList);
-        setCollectionBoys(employeesList.filter(e => e.role === "COLLECTION_BOY"));
-      } catch (err: any) {
-        console.error("Error loading informative reports initial data:", err);
+      setDoctors(doctorsList);
+      setTests(testsList);
+      setCollectionBoys(employeesList.filter(e => e.role === "COLLECTION_BOY"));
+      if (!isBackground) setErrorMsg("");
+    } catch (err: any) {
+      console.error("Error loading informative reports initial data:", err);
+      if (!isBackground) {
         setErrorMsg("Failed to connect to the reports server.");
         
         // Local fallback definition for absolute reliability
@@ -99,11 +100,14 @@ export default function InformativeReports({ labId, currentRole }: InformativeRe
         ];
         setReports(fallbackReports);
         setActiveReportId("patients_by_doctor");
-      } finally {
-        setLoading(false);
       }
+    } finally {
+      if (!isBackground) setLoading(false);
     }
+  };
 
+  // 1. Load available reports & filter dropdown items
+  useEffect(() => {
     // Default dates setup
     const todayStr = new Date().toISOString().split("T")[0];
     const firstDayStr = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split("T")[0];
@@ -113,6 +117,8 @@ export default function InformativeReports({ labId, currentRole }: InformativeRe
 
     loadInitialData();
   }, [labId]);
+
+  useIntervalRefetch(() => loadInitialData(true), 5000);
 
   const activeReport = reports.find(r => r.id === activeReportId);
 

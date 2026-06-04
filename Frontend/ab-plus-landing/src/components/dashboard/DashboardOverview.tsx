@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { apiService, LabDashboardStats, Expense, DailyCloseout } from "@/services/api";
+import { useIntervalRefetch } from "@/hooks/useIntervalRefetch";
 import {
   TrendingUp,
   TrendingDown,
@@ -33,8 +34,8 @@ export default function DashboardOverview({ labId, currentRole, labCode }: Overv
   const [stats, setStats] = useState<LabDashboardStats | null>(null);
   const [expenses, setExpenses] = useState<Expense[]>([]);
 
-  const fetchStatsAndExpenses = async (dateStr: string) => {
-    setLoading(true);
+  const fetchStatsAndExpenses = async (dateStr: string, isBackground = false) => {
+    if (!isBackground) setLoading(true);
     try {
       const [dashboardStats, dailyExpenses] = await Promise.all([
         apiService.getLabDashboardStats(labId, dateStr),
@@ -45,13 +46,15 @@ export default function DashboardOverview({ labId, currentRole, labCode }: Overv
     } catch (e) {
       console.error(e);
     } finally {
-      setLoading(false);
+      if (!isBackground) setLoading(false);
     }
   };
 
   useEffect(() => {
     fetchStatsAndExpenses(selectedDate);
   }, [labId, selectedDate]);
+
+  useIntervalRefetch(() => fetchStatsAndExpenses(selectedDate, true), 5000);
 
   if (loading && !stats) {
     return (

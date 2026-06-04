@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { apiService, User } from "@/services/api";
+import { useIntervalRefetch } from "@/hooks/useIntervalRefetch";
 import {
   Users,
   Plus,
@@ -61,23 +62,25 @@ export default function StaffManagement({ labId, currentRole }: StaffProps) {
   const [updating, setUpdating] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
-  const fetchEmployees = async () => {
-    setLoading(true);
+  const fetchEmployees = async (isBackground = false) => {
+    if (!isBackground) setLoading(true);
     try {
       const data = await apiService.getEmployees(labId);
       setEmployees(data);
-      setErrorMsg("");
+      if (!isBackground) setErrorMsg("");
     } catch (e) {
       console.error(e);
-      setErrorMsg("Failed to load staff list.");
+      if (!isBackground) setErrorMsg("Failed to load staff list.");
     } finally {
-      setLoading(false);
+      if (!isBackground) setLoading(false);
     }
   };
 
   useEffect(() => {
     fetchEmployees();
   }, [labId]);
+
+  useIntervalRefetch(() => fetchEmployees(true), 5000);
 
   const handleRegisterEmployee = async (e: React.FormEvent) => {
     e.preventDefault();

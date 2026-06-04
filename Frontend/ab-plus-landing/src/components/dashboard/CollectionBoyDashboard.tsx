@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { apiService, PathologyTest, ReferredDoctor, Expense } from "@/services/api";
+import { useIntervalRefetch } from "@/hooks/useIntervalRefetch";
 import {
   Calendar,
   ChevronLeft,
@@ -140,8 +141,8 @@ export default function CollectionBoyDashboard({
   }, [patReferredDoctorName, docDropdownOpen, labId]);
 
   // Fetch Dashboard Stats and Expenses
-  const loadDashboardData = async () => {
-    setLoading(true);
+  const loadDashboardData = async (isBackground = false) => {
+    if (!isBackground) setLoading(true);
     try {
       const statsData = await apiService.getCollectionBoyDashboardStats(
         labId,
@@ -158,13 +159,15 @@ export default function CollectionBoyDashboard({
     } catch {
       /* ignore */
     } finally {
-      setLoading(false);
+      if (!isBackground) setLoading(false);
     }
   };
 
   useEffect(() => {
     loadDashboardData();
   }, [selectedDate, labId, userName]);
+
+  useIntervalRefetch(() => loadDashboardData(true), 5000);
 
   // Date Navigation Helpers
   const shiftDate = (days: number) => {

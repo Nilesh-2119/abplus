@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { apiService, PatientEntry, LabSettings } from "@/services/api";
+import { useIntervalRefetch } from "@/hooks/useIntervalRefetch";
 import {
   Printer,
   Search,
@@ -39,8 +40,8 @@ export default function ReportsSection({ labId, currentRole }: ReportsProps) {
   const pageRefs = useRef<(HTMLDivElement | null)[]>([]);
   const scrollContainerRef = useRef<HTMLDivElement | null>(null);
 
-  const fetchData = async () => {
-    setLoading(true);
+  const fetchData = async (isBackground = false) => {
+    if (!isBackground) setLoading(true);
     try {
       const data = await apiService.getPatients(labId, currentRole, searchQuery, "COMPLETED");
       const deliveredData = await apiService.getPatients(labId, currentRole, searchQuery, "DELIVERED");
@@ -48,18 +49,32 @@ export default function ReportsSection({ labId, currentRole }: ReportsProps) {
       setPatients(combined);
       const settings = await apiService.getLabSettings(labId);
       setLabSettings(settings);
-      setErrorMsg("");
+      if (!isBackground) setErrorMsg("");
     } catch (e) {
       console.error(e);
-      setErrorMsg("Failed to retrieve reports database.");
+      if (!isBackground) setErrorMsg("Failed to retrieve reports database.");
     } finally {
-      setLoading(false);
+      if (!isBackground) setLoading(false);
     }
   };
 
   useEffect(() => {
     fetchData();
   }, [labId, searchQuery]);
+
+  useIntervalRefetch(() => fetchData(true), 5000);
+
+  // Keep activePatient in sync after refresh
+  useEffect(() => {
+    if (activePatient) {
+      const updated = patients.find(p => p.id === activePatient.id);
+      if (updated) {
+        setActivePatient(updated);
+      } else {
+        setActivePatient(null);
+      }
+    }
+  }, [patients]);
 
   // Reset to page 0 whenever patient changes
   useEffect(() => {
@@ -484,7 +499,7 @@ export default function ReportsSection({ labId, currentRole }: ReportsProps) {
                 <h3 className="text-[11px] font-black text-slate-800 uppercase tracking-wide">Pathology Reports List</h3>
               </div>
               <button
-                onClick={fetchData}
+                onClick={() => fetchData()}
                 className="p-1 border border-slate-100 hover:bg-slate-50 text-slate-400 hover:text-slate-600 rounded-lg transition-colors bg-white"
                 title="Refresh List"
               >

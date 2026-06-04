@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useRef } from "react";
 import { apiService, PatientEntry, PathologyTest, ReferredDoctor } from "@/services/api";
+import { useIntervalRefetch } from "@/hooks/useIntervalRefetch";
 import {
   Search,
   RefreshCw,
@@ -232,19 +233,25 @@ export default function PatientWorkflow({ labId, currentRole, userName = "Staff"
     return () => clearTimeout(h);
   }, [patReferredDoctorName, docDropdownOpen, labId]);
 
-  const fetchAll = async () => {
-    setLoading(true);
+  const fetchAll = async (isBackground = false) => {
+    if (!isBackground) setLoading(true);
     try {
       const data = await apiService.getPatients(labId, currentRole, searchQuery, statusFilter, selectedDate);
       setPatients(data);
       const testsData = await apiService.getTests(labId);
       setAvailableTests(testsData.filter(t => t.is_enabled));
-      setErrorMsg("");
-    } catch { setErrorMsg("Failed to load patient workflow."); }
-    finally { setLoading(false); }
+      if (!isBackground) setErrorMsg("");
+    } catch { 
+      if (!isBackground) setErrorMsg("Failed to load patient workflow."); 
+    }
+    finally { 
+      if (!isBackground) setLoading(false); 
+    }
   };
 
   useEffect(() => { fetchAll(); }, [labId, currentRole, searchQuery, statusFilter, selectedDate]);
+
+  useIntervalRefetch(() => fetchAll(true), 5000);
 
   // Keep drawer in sync after refresh
   useEffect(() => {

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { apiService, LabDashboardStats, User, Expense, DailyCloseout, CashierLabSettlement } from "@/services/api";
+import { useIntervalRefetch } from "@/hooks/useIntervalRefetch";
 import {
   Calendar,
   RefreshCw,
@@ -81,9 +82,11 @@ export default function CashierDashboard({ labId, currentRole, userName = "Cashi
   const [settlementNotes, setSettlementNotes] = useState("");
   const [submittingSettlement, setSubmittingSettlement] = useState(false);
 
-  const fetchStatsBoysExpensesAndCloseout = async (dateStr: string) => {
-    setLoading(true);
-    setErrorMsg("");
+  const fetchStatsBoysExpensesAndCloseout = async (dateStr: string, isBackground = false) => {
+    if (!isBackground) {
+      setLoading(true);
+      setErrorMsg("");
+    }
     try {
       // 1. Fetch top dashboard metrics
       const dashboardStats = await apiService.getLabDashboardStats(labId, dateStr);
@@ -103,13 +106,20 @@ export default function CashierDashboard({ labId, currentRole, userName = "Cashi
         (e) => e.role === "COLLECTION_BOY" && (e.status || "").toLowerCase() === "active"
       );
 
-      // Initialize rows with loading state
-      const initialRows: CollectionBoyRowData[] = boys.map((boy) => ({
-        user: boy,
-        stats: null,
-        loading: true,
-      }));
-      setCollectionBoys(initialRows);
+      // Initialize/update rows safely to prevent visual flicker in background
+      setCollectionBoys((prev) => {
+        if (isBackground && prev.length === boys.length && prev.every((row, i) => row.user.id === boys[i].id)) {
+          return prev;
+        }
+        return boys.map((boy) => {
+          const existing = prev.find((p) => p.user.id === boy.id);
+          return {
+            user: boy,
+            stats: existing?.stats || null,
+            loading: !existing,
+          };
+        });
+      });
 
       // Fetch stats for each boy in parallel
       const statsPromises = boys.map(async (boy) => {
@@ -132,22 +142,24 @@ export default function CashierDashboard({ labId, currentRole, userName = "Cashi
           const result = results.find((r) => r.userId === row.user.id);
           return {
             ...row,
-            stats: result?.stats || null,
+            stats: result?.stats || row.stats,
             loading: false,
           };
         })
       );
     } catch (e) {
       console.error(e);
-      setErrorMsg("Failed to retrieve dashboard details.");
+      if (!isBackground) setErrorMsg("Failed to retrieve dashboard details.");
     } finally {
-      setLoading(false);
+      if (!isBackground) setLoading(false);
     }
   };
 
   useEffect(() => {
     fetchStatsBoysExpensesAndCloseout(selectedDate);
   }, [labId, selectedDate]);
+
+  useIntervalRefetch(() => fetchStatsBoysExpensesAndCloseout(selectedDate, true), 5000);
 
   const handleRefresh = () => {
     fetchStatsBoysExpensesAndCloseout(selectedDate);

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { apiService, ReferredDoctor } from "@/services/api";
+import { useIntervalRefetch } from "@/hooks/useIntervalRefetch";
 import {
   Stethoscope,
   Plus,
@@ -60,23 +61,25 @@ export default function ReferredDoctors({ labId, currentRole }: ReferredDoctorsP
   } | null>(null);
   const [loadingStats, setLoadingStats] = useState(false);
 
-  const fetchDoctors = async () => {
-    setLoading(true);
+  const fetchDoctors = async (isBackground = false) => {
+    if (!isBackground) setLoading(true);
     try {
       const data = await apiService.getReferredDoctors(labId, searchQuery, statusFilter);
       setDoctors(data);
-      setErrorMsg("");
+      if (!isBackground) setErrorMsg("");
     } catch (e) {
       console.error(e);
-      setErrorMsg("Failed to retrieve referred doctors list.");
+      if (!isBackground) setErrorMsg("Failed to retrieve referred doctors list.");
     } finally {
-      setLoading(false);
+      if (!isBackground) setLoading(false);
     }
   };
 
   useEffect(() => {
     fetchDoctors();
   }, [labId, searchQuery, statusFilter]);
+
+  useIntervalRefetch(() => fetchDoctors(true), 5000);
 
   const handleOpenCreateModal = () => {
     setEditingDoctor(null);

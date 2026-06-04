@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useCallback } from "react";
 import { apiService } from "@/services/api";
+import { useIntervalRefetch } from "@/hooks/useIntervalRefetch";
 import {
   Percent,
   Users,
@@ -123,8 +124,8 @@ export default function CommissionReports({ labId }: CommissionReportsProps) {
   const [reportGenerating, setReportGenerating] = useState(false);
 
   // Load Main Dashboard Data
-  const loadData = useCallback(async () => {
-    setLoading(true);
+  const loadData = useCallback(async (isBackground = false) => {
+    if (!isBackground) setLoading(true);
     try {
       const statsData = await apiService.getCommissionDashboardStats(labId);
       setStats(statsData);
@@ -135,12 +136,12 @@ export default function CommissionReports({ labId }: CommissionReportsProps) {
         selectedYear
       );
       setReports(reportsData);
-      setErrorMsg("");
+      if (!isBackground) setErrorMsg("");
     } catch (e) {
       console.error(e);
-      setErrorMsg("Failed to load doctor commission information.");
+      if (!isBackground) setErrorMsg("Failed to load doctor commission information.");
     } finally {
-      setLoading(false);
+      if (!isBackground) setLoading(false);
     }
   }, [labId, selectedMonth, selectedYear]);
 
@@ -148,6 +149,8 @@ export default function CommissionReports({ labId }: CommissionReportsProps) {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     loadData();
   }, [loadData]);
+
+  useIntervalRefetch(() => loadData(true), 5000);
 
   // Load Doctor Details
   const loadDoctorDetail = async (doctorId: string) => {
