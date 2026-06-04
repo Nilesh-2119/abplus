@@ -435,6 +435,11 @@ export default function ReportsSection({ labId, currentRole }: ReportsProps) {
             box-sizing: border-box !important;
           }
         }
+        @media screen {
+          .preview-page-card {
+            zoom: 0.55;
+          }
+        }
       `}</style>
 
       {/* ── Search Toolbar ── */}
@@ -552,128 +557,6 @@ export default function ReportsSection({ labId, currentRole }: ReportsProps) {
                   <Printer size={13} />
                   <span>Print Report Layout</span>
                 </button>
-              </div>
-
-              {/* Page Navigator */}
-              <div className="bg-white border border-slate-200/80 rounded-2xl px-4 py-2.5 shadow-sm flex items-center justify-between shrink-0">
-                <button
-                  onClick={() => goToPage(currentPage - 1)}
-                  disabled={currentPage === 0}
-                  className="flex items-center gap-1 px-3 py-1.5 text-[10px] font-bold text-slate-600 hover:bg-slate-50 rounded-xl border border-slate-200 disabled:opacity-30 disabled:cursor-not-allowed transition-all cursor-pointer"
-                >
-                  <ChevronLeft size={13} /> Prev
-                </button>
-
-                {/* Page dots */}
-                <div className="flex items-center gap-1.5">
-                  {pages.map((p, idx) => (
-                    <button
-                      key={idx}
-                      onClick={() => goToPage(idx)}
-                      title={
-                        p.type === "cover"
-                          ? "Cover / Patient Info"
-                          : p.type === "footer"
-                          ? "Summary & Sign-off"
-                          : `Test ${p.testIndex + 1}: ${activePatient.tests[p.testIndex].name}`
-                      }
-                      className={`transition-all rounded-full cursor-pointer ${
-                        idx === currentPage
-                          ? "w-6 h-2.5 bg-cyan-500"
-                          : "w-2.5 h-2.5 bg-slate-200 hover:bg-slate-300"
-                      }`}
-                    />
-                  ))}
-                </div>
-
-                <button
-                  onClick={() => goToPage(currentPage + 1)}
-                  disabled={currentPage === totalPages - 1}
-                  className="flex items-center gap-1 px-3 py-1.5 text-[10px] font-bold text-slate-600 hover:bg-slate-50 rounded-xl border border-slate-200 disabled:opacity-30 disabled:cursor-not-allowed transition-all cursor-pointer"
-                >
-                  Next <ChevronRight size={13} />
-                </button>
-              </div>
-
-              {/* Letterhead Print Adjustments Panel */}
-              <div className="bg-white border border-slate-200/80 rounded-2xl p-4 shadow-sm space-y-3 shrink-0">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="checkbox"
-                      id="use-letterhead-toggle"
-                      disabled={!labSettings?.letterhead_base64}
-                      checked={useLetterhead && !!labSettings?.letterhead_base64}
-                      onChange={(e) => setUseLetterhead(e.target.checked)}
-                      className="h-4 w-4 rounded border-slate-300 text-cyan-600 focus:ring-cyan-500/20 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-                    />
-                    <label
-                      htmlFor="use-letterhead-toggle"
-                      className={`text-xs font-black cursor-pointer ${
-                        labSettings?.letterhead_base64 ? "text-slate-700" : "text-slate-400"
-                      }`}
-                    >
-                      Overlay on Letterhead Background Image
-                    </label>
-                  </div>
-                  <span className="text-[8px] font-black text-cyan-600 bg-cyan-50 px-2.5 py-1 rounded-lg border border-cyan-100 uppercase tracking-widest self-start sm:self-auto font-mono">
-                    Print Offset Adjustments
-                  </span>
-                </div>
-
-                {labSettings?.letterhead_base64 ? (
-                  useLetterhead && (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-1 border-t border-slate-100/80">
-                      <div className="space-y-1">
-                        <div className="flex justify-between text-[10px] font-bold text-slate-500">
-                          <span>Top Padding (Header margin)</span>
-                          <span className="font-mono text-cyan-600 font-bold">{topPadding}mm</span>
-                        </div>
-                        <input
-                          type="range"
-                          min="20"
-                          max="100"
-                          value={topPadding}
-                          onChange={(e) => setTopPadding(Number(e.target.value))}
-                          className="w-full h-1 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-cyan-500"
-                        />
-                        <p className="text-[8px] text-slate-400 font-medium">Clear pre-printed headers (logo/address block).</p>
-                      </div>
-
-                      <div className="space-y-1">
-                        <div className="flex justify-between text-[10px] font-bold text-slate-500">
-                          <span>Bottom Padding (Footer margin)</span>
-                          <span className="font-mono text-cyan-600 font-bold">{bottomPadding}mm</span>
-                        </div>
-                        <input
-                          type="range"
-                          min="10"
-                          max="60"
-                          value={bottomPadding}
-                          onChange={(e) => setBottomPadding(Number(e.target.value))}
-                          className="w-full h-1 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-cyan-500"
-                        />
-                        <p className="text-[8px] text-slate-400 font-medium">Clear pre-printed footer lines/contact details.</p>
-                      </div>
-                    </div>
-                  )
-                ) : (
-                  <p className="text-[9px] text-slate-400 font-bold uppercase tracking-wide flex items-center gap-1.5 bg-slate-50 p-2 rounded-xl border border-slate-100">
-                    <span className="h-1.5 w-1.5 rounded-full bg-amber-400 shrink-0" />
-                    No letterhead image uploaded. Upload one under Lab Settings to overlay reports onto official letterheads.
-                  </p>
-                )}
-              </div>
-
-              {/* Page counter label */}
-              <div className="text-center -mt-1.5">
-                <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">
-                  {currentPage === 0
-                    ? "Cover · Patient Info"
-                    : currentPage === totalPages - 1
-                    ? "Summary · Sign-off"
-                    : `Test ${currentPage} of ${totalPages - 2} · ${activePatient.tests[currentPage - 1]?.name}`}
-                </span>
               </div>
 
               {/* Scrollable Pages Container */}
@@ -937,7 +820,7 @@ export default function ReportsSection({ labId, currentRole }: ReportsProps) {
                     initial={{ opacity: 0, y: 16 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: pageIdx * 0.04, duration: 0.35 }}
-                    className={`relative bg-white rounded-2xl shadow-md border transition-all duration-300 overflow-hidden flex flex-col shrink-0 w-[210mm] max-w-full aspect-[210/297] mx-auto ${
+                    className={`preview-page-card relative bg-white rounded-2xl shadow-md border transition-all duration-300 overflow-hidden flex flex-col shrink-0 w-[210mm] max-w-full aspect-[210/297] mx-auto ${
                       pageIdx === currentPage
                         ? "border-cyan-300 shadow-cyan-100/50 shadow-lg ring-1 ring-cyan-200/50"
                         : "border-slate-200/80"
