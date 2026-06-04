@@ -105,6 +105,25 @@ class Lab(SoftDeleteModel):
 
         super().save(*args, **kwargs)
 
+    def delete(self, using=None, keep_parents=False, deleted_by_user=None):
+        from django.utils import timezone
+        now = timezone.now()
+        
+        # 1. Soft-delete the lab itself
+        self.delete_flag = 'Y'
+        self.deleted_at = now
+        if deleted_by_user:
+            self.deleted_by = deleted_by_user
+        self.save(using=using)
+        
+        # 2. Cascade soft-delete to related active tenant models
+        self.users.all().update(delete_flag='Y', deleted_at=now, deleted_by=deleted_by_user)
+        self.patients.all().update(delete_flag='Y', deleted_at=now, deleted_by=deleted_by_user)
+        self.expenses.all().update(delete_flag='Y', deleted_at=now, deleted_by=deleted_by_user)
+        self.tests.all().update(delete_flag='Y', deleted_at=now, deleted_by=deleted_by_user)
+        self.referred_doctors.all().update(delete_flag='Y', deleted_at=now, deleted_by=deleted_by_user)
+
+
 
 class CustomUser(AbstractUser, SoftDeleteModel):
     """
@@ -213,6 +232,7 @@ class MasterTest(SoftDeleteModel):
     tube_color = models.CharField(max_length=100)
     default_price = models.DecimalField(max_digits=10, decimal_places=2, default=150.00)
     is_active = models.BooleanField(default=True, db_index=True)
+    commission_percentage = models.DecimalField(max_digits=5, decimal_places=2, default=50.00)
     created_at = models.DateTimeField(auto_now_add=True, db_index=True)
 
     class Meta:
@@ -284,6 +304,7 @@ class LabTest(SoftDeleteModel):
     tube_color = models.CharField(max_length=100)
     is_enabled = models.BooleanField(default=True, db_index=True)
     is_custom = models.BooleanField(default=False)
+    commission_percentage = models.DecimalField(max_digits=5, decimal_places=2, default=50.00)
     created_at = models.DateTimeField(auto_now_add=True, db_index=True)
 
     class Meta:
@@ -503,6 +524,53 @@ class PatientEntry(SoftDeleteModel):
             # Soft-delete report details if it exists
             if hasattr(self, 'report_details') and self.report_details:
                 self.report_details.delete(deleted_by_user=deleted_by_user)
+
+
+class DoctorCommissionEntry(SoftDeleteModel):
+    id = models.CharField(max_length=50, primary_key=True, blank=True)
+    lab = models.ForeignKey(
+        Lab,
+        on_delete=models.CASCADE,
+        related_name='commission_entries',
+        db_index=True
+    )
+    patient = models.ForeignKey(
+        PatientEntry,
+        on_delete=models.CASCADE,
+        related_name='commission_entries',
+        db_index=True
+    )
+    doctor = models.ForeignKey(
+        ReferredDoctor,
+        on_delete=models.CASCADE,
+        related_name='commission_entries',
+        db_index=True
+    )
+    test = models.ForeignKey(
+        LabTest,
+        on_delete=models.CASCADE,
+        related_name='commission_entries',
+        db_index=True
+    )
+    test_price = models.DecimalField(max_digits=10, decimal_places=2)
+    commission_percentage = models.DecimalField(max_digits=5, decimal_places=2)
+    commission_amount = models.DecimalField(max_digits=10, decimal_places=2)
+    entry_date = models.DateField(default=timezone.localdate, db_index=True)
+    is_paid = models.BooleanField(default=False, db_index=True)
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'doctor_commission_entries'
+        ordering = ['-entry_date', '-created_at']
+
+    def __str__(self):
+        return f"Comm: {self.doctor.doctor_name} - {self.test.name} on {self.entry_date}"
+
+    def save(self, *args, **kwargs):
+        if not self.id:
+            self.id = f"COM-{uuid.uuid4().hex[:6].upper()}"
+        super().save(*args, **kwargs)
 
 
 class Expense(SoftDeleteModel):
@@ -785,4 +853,23 @@ class PaymentTransaction(SoftDeleteModel):
         patient.save(update_fields=['paid_amount', 'concession', 'payment_status'])
 
 
+class DailyCashSnapshot(SoftDeleteModel):
+    user = models.ForeignKey(
+        CustomUser,
+        on_delete=models.CASCADE,
+        db_column='user_id',
+        related_name='daily_cash_snapshots'
+    )
+    snapshot_date = models.DateField(db_index=True)
+    opening_cash_balance = models.DecimalField(max_digits=12, decimal_places=2, default=0.00)
+    cash_collected_today = models.DecimalField(max_digits=12, decimal_places=2, default=0.00)
+    expenses_today = models.DecimalField(max_digits=12, decimal_places=2, default=0.00)
+    cash_submitted_today = models.DecimalField(max_digits=12, decimal_places=2, default=0.00)
+    closing_cash_balance = models.DecimalField(max_digits=12, decimal_places=2, default=0.00)
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+    updated_at = models.DateTimeField(auto_now=True)
 
+    class Meta:
+        db_table = 'daily_cash_snapshot'
+        unique_together = ('user', 'snapshot_date')
+        ordering = ['snapshot_date']

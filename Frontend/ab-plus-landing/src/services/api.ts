@@ -1,6 +1,8 @@
+/* eslint-disable @typescript-eslint/no-explicit-any, prefer-const, @typescript-eslint/no-unused-vars */
 // AB+ Pathology Lab Management SaaS API Service
 // This service simulates DRF backend responses with mock database state in localStorage.
 // Switch IS_MOCK to false and configure API_URL to hook up to a real Django backend.
+
 
 export const IS_MOCK = false;
 
@@ -92,6 +94,7 @@ export interface Lab {
   admin_username?: string;
   users_count: number;
   patient_count: number;
+  lab_code?: string;
 }
 
 export interface DashboardStats {
@@ -178,6 +181,7 @@ export interface PathologyTest {
   is_enabled: boolean;
   parameters: TestParameter[];
   is_custom?: boolean;
+  commission_percentage?: number;
 }
 
 export interface MasterTestParameter {
@@ -198,6 +202,7 @@ export interface MasterTest {
   tube_color: string;
   is_active: boolean;
   parameters: MasterTestParameter[];
+  commission_percentage?: number;
 }
 
 export interface PaymentTransaction {
@@ -209,6 +214,25 @@ export interface PaymentTransaction {
   received_by_name?: string;
   payment_mode: "CASH" | "CARD" | "UPI" | "CREDIT";
   notes?: string;
+}
+
+export interface DoctorCommissionEntry {
+  id: string;
+  labId: string;
+  patientId: string;
+  patientName: string;
+  patientCode: string;
+  doctorId: string;
+  doctorName?: string;
+  hospitalName?: string;
+  testId: string;
+  testName: string;
+  testPrice: number;
+  commission_percentage: number;
+  commission_amount: number;
+  entry_date: string;
+  is_paid: boolean;
+  created_at: string;
 }
 
 export interface PatientEntry {
@@ -301,9 +325,10 @@ const getMockState = (): {
   expenses: Expense[];
   referredDoctors: ReferredDoctor[];
   settings: Record<string, LabSettings>;
+  commissionEntries: DoctorCommissionEntry[];
 } => {
   if (typeof window === "undefined") {
-    return { labs: [], logs: [], users: [], tests: [], masterTests: [], patients: [], expenses: [], referredDoctors: [], settings: {} };
+    return { labs: [], logs: [], users: [], tests: [], masterTests: [], patients: [], expenses: [], referredDoctors: [], settings: {}, commissionEntries: [] };
   }
 
   let labsRaw = localStorage.getItem("abplus_mock_labs");
@@ -315,6 +340,7 @@ const getMockState = (): {
   let expensesRaw = localStorage.getItem("abplus_mock_expenses");
   let referredDoctorsRaw = localStorage.getItem("abplus_mock_referred_doctors");
   let settingsRaw = localStorage.getItem("abplus_mock_settings");
+  let commissionEntriesRaw = localStorage.getItem("abplus_mock_commission_entries");
 
   // Clear outdated mock state if seeded test catalog size is less than 50
   if (masterTestsRaw) {
@@ -1970,16 +1996,78 @@ const getMockState = (): {
     settingsRaw = JSON.stringify(initialSettings);
   }
 
+  const labs = JSON.parse(labsRaw);
+  const logs = JSON.parse(logsRaw || "[]");
+  const users = JSON.parse(usersRaw || "[]");
+  const tests = JSON.parse(testsRaw || "[]");
+  const masterTests = JSON.parse(masterTestsRaw || "[]");
+  const patients = JSON.parse(patientsRaw || "[]");
+  const expenses = JSON.parse(expensesRaw || "[]");
+  const referredDoctors = JSON.parse(referredDoctorsRaw || "[]");
+  const settings = JSON.parse(settingsRaw || "{}");
+  
+  let commissionEntries: DoctorCommissionEntry[] = [];
+  try {
+    commissionEntries = JSON.parse(commissionEntriesRaw || "[]");
+  } catch (e) {
+    commissionEntries = [];
+  }
+
+  // Auto-seed mock commission snapshots for existing patients if empty
+  if (commissionEntries.length === 0 && patients.length > 0) {
+    patients.forEach((patient: PatientEntry) => {
+      if (patient.referred_doctor_id) {
+        const doctor = referredDoctors.find((d: ReferredDoctor) => d.id === patient.referred_doctor_id);
+        const doctorName = doctor ? doctor.doctor_name : (patient.referred_doctor_name || "Direct Referral");
+        const hospitalName = doctor ? doctor.hospital_name : "Direct Referral";
+        
+        const patientTests = patient.tests || [];
+        patientTests.forEach((t: any) => {
+          const testId = typeof t === "string" ? t : t.id;
+          const test = typeof t === "object" ? t : tests.find((x: any) => x.id === testId);
+          if (test) {
+            const commission_percentage = test.commission_percentage !== undefined ? test.commission_percentage : 50;
+            const testPrice = test.price || 0;
+            const commission_amount = (testPrice * commission_percentage) / 100;
+            
+            commissionEntries.push({
+              id: `COM-${Math.floor(100000 + Math.random() * 900000)}`,
+              labId: patient.labId || "LAB-01",
+              patientId: patient.id,
+              patientName: patient.name,
+              patientCode: patient.id,
+              doctorId: patient.referred_doctor_id!,
+              doctorName,
+              hospitalName,
+              testId: test.id,
+              testName: test.name,
+              testPrice,
+              commission_percentage,
+              commission_amount,
+              entry_date: patient.created_at || new Date().toISOString().split("T")[0],
+              is_paid: false,
+              created_at: new Date().toISOString()
+            });
+          }
+        });
+      }
+    });
+    if (typeof window !== "undefined") {
+      localStorage.setItem("abplus_mock_commission_entries", JSON.stringify(commissionEntries));
+    }
+  }
+
   return {
-    labs: JSON.parse(labsRaw),
-    logs: JSON.parse(logsRaw || "[]"),
-    users: JSON.parse(usersRaw || "[]"),
-    tests: JSON.parse(testsRaw || "[]"),
-    masterTests: JSON.parse(masterTestsRaw || "[]"),
-    patients: JSON.parse(patientsRaw || "[]"),
-    expenses: JSON.parse(expensesRaw || "[]"),
-    referredDoctors: JSON.parse(referredDoctorsRaw || "[]"),
-    settings: JSON.parse(settingsRaw || "{}"),
+    labs,
+    logs,
+    users,
+    tests,
+    masterTests,
+    patients,
+    expenses,
+    referredDoctors,
+    settings,
+    commissionEntries,
   };
 };
 
@@ -1993,6 +2081,7 @@ const saveMockState = (state: {
   expenses: Expense[];
   referredDoctors: ReferredDoctor[];
   settings: Record<string, LabSettings>;
+  commissionEntries: DoctorCommissionEntry[];
 }) => {
   if (typeof window !== "undefined") {
     localStorage.setItem("abplus_mock_labs", JSON.stringify(state.labs));
@@ -2004,8 +2093,77 @@ const saveMockState = (state: {
     localStorage.setItem("abplus_mock_expenses", JSON.stringify(state.expenses));
     localStorage.setItem("abplus_mock_referred_doctors", JSON.stringify(state.referredDoctors));
     localStorage.setItem("abplus_mock_settings", JSON.stringify(state.settings));
+    localStorage.setItem("abplus_mock_commission_entries", JSON.stringify(state.commissionEntries));
   }
 };
+
+function recalculateMockCommissionEntries(state: any, patient: PatientEntry) {
+  if (!state.commissionEntries) {
+    state.commissionEntries = [];
+  }
+
+  // 1. If patient has no referred doctor, remove all their entries.
+  if (!patient.referred_doctor_id) {
+    state.commissionEntries = state.commissionEntries.filter(
+      (e: any) => e.patientId !== patient.id
+    );
+    return;
+  }
+
+  const patientTests = patient.tests || [];
+  const testIds = patientTests.map((t: any) => typeof t === "string" ? t : t.id);
+
+  // 2. Remove entries for tests that are no longer active
+  state.commissionEntries = state.commissionEntries.filter((e: any) => {
+    if (e.patientId !== patient.id) return true;
+    return testIds.includes(e.testId);
+  });
+
+  // 3. Create or update entries for active tests
+  const doctor = state.referredDoctors.find((d: any) => d.id === patient.referred_doctor_id);
+  const doctorName = doctor ? doctor.doctor_name : (patient.referred_doctor_name || "Direct Referral");
+  const hospitalName = doctor ? doctor.hospital_name : "Direct Referral";
+
+  testIds.forEach((testId: string) => {
+    // Tests might be full test objects or string IDs in frontend
+    const fullTest = typeof patientTests[0] === "object" ? patientTests.find((t: any) => t.id === testId) : null;
+    const test = fullTest || state.tests.find((t: any) => t.id === testId);
+    if (!test) return;
+
+    const existing = state.commissionEntries.find(
+      (e: any) => e.patientId === patient.id && e.testId === testId
+    );
+
+    const commission_percentage = test.commission_percentage !== undefined ? test.commission_percentage : 50;
+    const testPrice = test.price || 0;
+    const commission_amount = (testPrice * commission_percentage) / 100;
+
+    if (existing) {
+      existing.doctorId = patient.referred_doctor_id!;
+      existing.doctorName = doctorName;
+      existing.hospitalName = hospitalName;
+    } else {
+      state.commissionEntries.push({
+        id: `COM-${Math.floor(100000 + Math.random() * 900000)}`,
+        labId: patient.labId || "LAB-01",
+        patientId: patient.id,
+        patientName: patient.name,
+        patientCode: patient.id,
+        doctorId: patient.referred_doctor_id!,
+        doctorName,
+        hospitalName,
+        testId: test.id,
+        testName: test.name,
+        testPrice,
+        commission_percentage,
+        commission_amount,
+        entry_date: patient.created_at || new Date().toISOString().split("T")[0],
+        is_paid: false,
+        created_at: new Date().toISOString()
+      });
+    }
+  });
+}
 
 function parsePathologyTest(t: any): PathologyTest {
   return {
@@ -2347,7 +2505,8 @@ export const apiService = {
           address: labData.address,
           phone: labData.phone,
           admin_name: labData.admin_name,
-          admin_email: labData.admin_email
+          admin_email: labData.admin_email,
+          lab_code: labData.lab_code
         }),
       });
       return res.json();
@@ -2364,6 +2523,45 @@ export const apiService = {
     saveMockState(state);
     return state.labs[labIdx];
   },
+
+  // DELETE /labs/:id
+  async deleteLab(id: string): Promise<boolean> {
+    if (!IS_MOCK) {
+      const res = await authFetch(`${API_URL}/labs/${id}/`, {
+        method: "DELETE",
+      });
+      return res.ok;
+    }
+    await delay(300);
+    const state = getMockState();
+    const labIdx = state.labs.findIndex((l) => l.id === id);
+    if (labIdx === -1) return false;
+    
+    const lab = state.labs[labIdx];
+    
+    // Remove the lab
+    state.labs.splice(labIdx, 1);
+    
+    // Also remove users and tests associated with this lab
+    state.users = state.users.filter((u) => u.labId !== id && u.lab_id !== id);
+    state.tests = state.tests.filter((t) => t.labId !== id);
+    state.patients = state.patients.filter((p) => p.labId !== id);
+    state.expenses = state.expenses.filter((e) => e.labId !== id);
+    
+    // Log the delete action
+    const newLog: ActivityLog = {
+      id: `LOG-${Math.floor(100 + Math.random() * 900)}`,
+      action: `Super Admin deleted lab ${lab.name}`,
+      timestamp: new Date().toISOString(),
+      user_email: "superadmin@abplus.in",
+      lab_name: lab.name,
+    };
+    state.logs.push(newLog);
+    
+    saveMockState(state);
+    return true;
+  },
+
 
   // GET /dashboard/logs
   async getActivityLogs(params: { page: number; limit?: number }): Promise<{ results: ActivityLog[]; count: number }> {
@@ -3188,6 +3386,7 @@ export const apiService = {
     };
 
     state.patients.push(newPat);
+    recalculateMockCommissionEntries(state, newPat);
 
     // Update patient_count for the lab
     const labIdx = state.labs.findIndex((l) => l.id === labId);
@@ -3444,6 +3643,7 @@ export const apiService = {
       lab_name: labName
     });
 
+    recalculateMockCommissionEntries(state, p);
     saveMockState(state);
     return p;
   },
@@ -3519,6 +3719,7 @@ export const apiService = {
     const loggedInEmail = typeof window !== "undefined" ? localStorage.getItem("abplus_logged_in_email") || "collection@abplus.in" : "collection@abplus.in";
 
     state.patients.splice(idx, 1);
+    state.commissionEntries = (state.commissionEntries || []).filter(e => e.patientId !== patientId);
 
     state.logs.push({
       id: `LOG-${Math.floor(1000 + Math.random() * 9000)}`,
@@ -4189,5 +4390,445 @@ export const apiService = {
     if (!doc) throw new Error("Referred doctor not found");
     const newStatus = doc.status === "Active" ? "Inactive" : "Active";
     return this.updateReferredDoctor(labId, id, { status: newStatus });
+  },
+
+  async deleteReferredDoctor(labId: string, id: string): Promise<boolean> {
+    if (!IS_MOCK) {
+      const res = await authFetch(`${API_URL}/referred-doctors/${id}/`, {
+        method: "DELETE",
+      });
+      return res.ok;
+    }
+    await delay(300);
+    const state = getMockState();
+    const docIdx = state.referredDoctors.findIndex(d => d.id === id && d.labId === labId);
+    if (docIdx === -1) return false;
+    
+    const doc = state.referredDoctors[docIdx];
+    state.referredDoctors.splice(docIdx, 1);
+    
+    const lab = state.labs.find(l => l.id === labId);
+    const labName = lab ? lab.name : "AB+ Diagnostic Laboratory";
+    const loggedInEmail = typeof window !== "undefined" ? localStorage.getItem("abplus_logged_in_email") || "doctor@abplus.in" : "doctor@abplus.in";
+
+    state.logs.push({
+      id: `LOG-${Math.floor(1000 + Math.random() * 9000)}`,
+      action: `Soft deleted referred doctor: ${doc.doctor_name} (${doc.id})`,
+      timestamp: new Date().toISOString(),
+      user_email: loggedInEmail,
+      lab_name: labName
+    });
+    
+    saveMockState(state);
+    return true;
+  },
+
+  async getReferredDoctorStats(labId: string, id: string): Promise<{
+    total_patients: number;
+    total_revenue: number;
+    first_referral_date: string | null;
+    last_referral_date: string | null;
+    patients_this_month: number;
+    patients_this_year: number;
+  }> {
+    if (!IS_MOCK) {
+      const res = await authFetch(`${API_URL}/referred-doctors/${id}/stats/`);
+      if (!res.ok) {
+        throw new Error("Failed to load doctor statistics.");
+      }
+      return res.json();
+    }
+    await delay(300);
+    const state = getMockState();
+    const patients = state.patients.filter(p => p.labId === labId && p.referred_doctor_id === id);
+    
+    const total_patients = patients.length;
+    const total_revenue = patients.reduce((sum, p) => sum + (p.total_bill || 0), 0);
+    
+    const sorted = [...patients].sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+    const first_referral_date = sorted.length > 0 ? sorted[0].created_at.split('T')[0] : null;
+    const last_referral_date = sorted.length > 0 ? sorted[sorted.length - 1].created_at.split('T')[0] : null;
+    
+    const today = new Date();
+    const currentMonth = today.getMonth();
+    const currentYear = today.getFullYear();
+    
+    const patients_this_month = patients.filter(p => {
+      const d = new Date(p.created_at);
+      return d.getMonth() === currentMonth && d.getFullYear() === currentYear;
+    }).length;
+    
+    const patients_this_year = patients.filter(p => {
+      const d = new Date(p.created_at);
+      return d.getFullYear() === currentYear;
+    }).length;
+    
+    return {
+      total_patients,
+      total_revenue,
+      first_referral_date,
+      last_referral_date,
+      patients_this_month,
+      patients_this_year
+    };
+  },
+
+  async getCommissionDashboardStats(labId: string): Promise<{
+    total_earned: number;
+    doctors_count: number;
+    pending_commission: number;
+    top_doctor: {
+      id: string;
+      name: string;
+      hospital: string;
+      total_commission: number;
+      patient_count: number;
+    } | null;
+  }> {
+    if (!IS_MOCK) {
+      const res = await authFetch(`${API_URL}/commission/stats/?lab_id=${labId}`);
+      if (!res.ok) throw new Error("Failed to load commission statistics.");
+      return res.json();
+    }
+    await delay(300);
+    const state = getMockState();
+    const entries = (state.commissionEntries || []).filter(e => e.labId === labId);
+
+    const today = new Date();
+    const currentMonth = today.getMonth();
+    const currentYear = today.getFullYear();
+
+    const monthEntries = entries.filter(e => {
+      const d = new Date(e.entry_date);
+      return d.getMonth() === currentMonth && d.getFullYear() === currentYear;
+    });
+
+    const total_earned = monthEntries.reduce((sum, e) => sum + e.commission_amount, 0);
+    const doctors_count = new Set(monthEntries.map(e => e.doctorId)).size;
+    const pending_commission = entries.filter(e => !e.is_paid).reduce((sum, e) => sum + e.commission_amount, 0);
+
+    const doctorStats: Record<string, { id: string; name: string; hospital: string; total_commission: number; patient_count: number; patients: Set<string> }> = {};
+    monthEntries.forEach(e => {
+      if (!doctorStats[e.doctorId]) {
+        doctorStats[e.doctorId] = {
+          id: e.doctorId,
+          name: e.doctorName || "Unknown Doctor",
+          hospital: e.hospitalName || "Hospital",
+          total_commission: 0,
+          patient_count: 0,
+          patients: new Set()
+        };
+      }
+      doctorStats[e.doctorId].total_commission += e.commission_amount;
+      doctorStats[e.doctorId].patients.add(e.patientId);
+    });
+
+    let top_doctor = null;
+    let maxComm = -1;
+    Object.values(doctorStats).forEach(ds => {
+      ds.patient_count = ds.patients.size;
+      if (ds.total_commission > maxComm) {
+        maxComm = ds.total_commission;
+        top_doctor = {
+          id: ds.id,
+          name: ds.name,
+          hospital: ds.hospital,
+          total_commission: ds.total_commission,
+          patient_count: ds.patient_count
+        };
+      }
+    });
+
+    return {
+      total_earned,
+      doctors_count,
+      pending_commission,
+      top_doctor
+    };
+  },
+
+  async getCommissionReports(labId: string, month: number, year: number, doctorId?: string): Promise<Array<{
+    doctor_id: string;
+    doctor_name: string;
+    hospital_name: string;
+    patient_count: number;
+    total_revenue: number;
+    total_commission: number;
+    unpaid_commission: number;
+    paid_commission: number;
+  }>> {
+    if (!IS_MOCK) {
+      let url = `${API_URL}/commission/reports/?lab_id=${labId}&month=${month}&year=${year}`;
+      if (doctorId) url += `&doctor_id=${doctorId}`;
+      const res = await authFetch(url);
+      if (!res.ok) throw new Error("Failed to load commission reports.");
+      return res.json();
+    }
+    await delay(300);
+    const state = getMockState();
+    let entries = (state.commissionEntries || []).filter(e => {
+      const d = new Date(e.entry_date);
+      return e.labId === labId && (d.getMonth() + 1) === month && d.getFullYear() === year;
+    });
+
+    if (doctorId) {
+      entries = entries.filter(e => e.doctorId === doctorId);
+    }
+
+    const doctorGroups: Record<string, {
+      doctor_id: string;
+      doctor_name: string;
+      hospital_name: string;
+      patients: Set<string>;
+      total_revenue: number;
+      total_commission: number;
+      unpaid_commission: number;
+      paid_commission: number;
+    }> = {};
+
+    entries.forEach(e => {
+      if (!doctorGroups[e.doctorId]) {
+        doctorGroups[e.doctorId] = {
+          doctor_id: e.doctorId,
+          doctor_name: e.doctorName || "Unknown Doctor",
+          hospital_name: e.hospitalName || "Hospital",
+          patients: new Set(),
+          total_revenue: 0,
+          total_commission: 0,
+          unpaid_commission: 0,
+          paid_commission: 0
+        };
+      }
+      const group = doctorGroups[e.doctorId];
+      group.patients.add(e.patientId);
+      group.total_revenue += e.testPrice;
+      group.total_commission += e.commission_amount;
+      if (e.is_paid) {
+        group.paid_commission += e.commission_amount;
+      } else {
+        group.unpaid_commission += e.commission_amount;
+      }
+    });
+
+    return Object.values(doctorGroups).map(g => ({
+      doctor_id: g.doctor_id,
+      doctor_name: g.doctor_name,
+      hospital_name: g.hospital_name,
+      patient_count: g.patients.size,
+      total_revenue: g.total_revenue,
+      total_commission: g.total_commission,
+      unpaid_commission: g.unpaid_commission,
+      paid_commission: g.paid_commission
+    })).sort((a, b) => b.total_commission - a.total_commission);
+  },
+
+  async settleDoctorCommission(labId: string, doctorId: string, month: number, year: number): Promise<{
+    message: string;
+    settled_count: number;
+  }> {
+    if (!IS_MOCK) {
+      const res = await authFetch(`${API_URL}/commission/settle/`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ lab_id: labId, doctor_id: doctorId, month, year })
+      });
+      if (!res.ok) throw new Error("Failed to settle commission.");
+      return res.json();
+    }
+    await delay(300);
+    const state = getMockState();
+    let settled_count = 0;
+    (state.commissionEntries || []).forEach(e => {
+      const d = new Date(e.entry_date);
+      if (e.labId === labId && e.doctorId === doctorId && (d.getMonth() + 1) === month && d.getFullYear() === year && !e.is_paid) {
+        e.is_paid = true;
+        settled_count++;
+      }
+    });
+
+    if (settled_count > 0) {
+      saveMockState(state);
+    }
+    return {
+      message: `Successfully settled ${settled_count} commission entries.`,
+      settled_count
+    };
+  },
+
+  async getDoctorCommissionDetail(labId: string, doctorId: string, month?: number, year?: number): Promise<{
+    doctor_id: string;
+    doctor_name: string;
+    hospital_name: string;
+    summary: {
+      total_revenue: number;
+      total_commission: number;
+      unpaid_commission: number;
+      paid_commission: number;
+      patient_count: number;
+    };
+    entries: Array<{
+      id: string;
+      patient_id: string;
+      patient_name: string;
+      patient_code: string;
+      test_id: string;
+      test_name: string;
+      test_price: number;
+      commission_percentage: number;
+      commission_amount: number;
+      entry_date: string;
+      is_paid: boolean;
+      created_at: string;
+    }>;
+  }> {
+    if (!IS_MOCK) {
+      let url = `${API_URL}/commission/doctor/${doctorId}/?lab_id=${labId}`;
+      if (month && year) url += `&month=${month}&year=${year}`;
+      const res = await authFetch(url);
+      if (!res.ok) throw new Error("Failed to load doctor commission details.");
+      return res.json();
+    }
+    await delay(300);
+    const state = getMockState();
+    const doctor = state.referredDoctors.find(d => d.id === doctorId);
+    if (!doctor) throw new Error("Doctor not found");
+
+    let filtered = (state.commissionEntries || []).filter(e => e.labId === labId && e.doctorId === doctorId);
+    if (month && year) {
+      filtered = filtered.filter(e => {
+        const d = new Date(e.entry_date);
+        return (d.getMonth() + 1) === month && d.getFullYear() === year;
+      });
+    }
+
+    const entries = filtered.map(e => ({
+      id: e.id,
+      patient_id: e.patientId,
+      patient_name: e.patientName,
+      patient_code: e.patientCode,
+      test_id: e.testId,
+      test_name: e.testName,
+      test_price: e.testPrice,
+      commission_percentage: e.commission_percentage,
+      commission_amount: e.commission_amount,
+      entry_date: e.entry_date,
+      is_paid: e.is_paid,
+      created_at: e.created_at
+    }));
+
+    const total_revenue = entries.reduce((sum, e) => sum + e.test_price, 0);
+    const total_commission = entries.reduce((sum, e) => sum + e.commission_amount, 0);
+    const unpaid_commission = entries.filter(e => !e.is_paid).reduce((sum, e) => sum + e.commission_amount, 0);
+    const paid_commission = entries.filter(e => e.is_paid).reduce((sum, e) => sum + e.commission_amount, 0);
+    const patient_count = new Set(entries.map(e => e.patient_id)).size;
+
+    return {
+      doctor_id: doctorId,
+      doctor_name: doctor.doctor_name,
+      hospital_name: doctor.hospital_name,
+      summary: {
+        total_revenue,
+        total_commission,
+        unpaid_commission,
+        paid_commission,
+        patient_count
+      },
+      entries
+    };
+  },
+
+  async getCommissionReportPreview(labId: string, params: {
+    type: 'consolidated' | 'doctor_wise';
+    from_date: string;
+    to_date: string;
+    doctor_id?: string;
+    include_patients?: boolean;
+  }): Promise<any> {
+    if (!IS_MOCK) {
+      const queryParams = new URLSearchParams({
+        lab_id: labId,
+        type: params.type,
+        from_date: params.from_date,
+        to_date: params.to_date,
+      });
+      if (params.doctor_id) queryParams.set('doctor_id', params.doctor_id);
+      if (params.include_patients) queryParams.set('include_patients', 'true');
+      const res = await authFetch(`${API_URL}/commission/report-preview/?${queryParams.toString()}`);
+      if (!res.ok) throw new Error('Failed to load commission report preview.');
+      return res.json();
+    }
+    // Mock fallback - aggregate from local commission entries
+    await delay(400);
+    return { report_type: params.type, from_date: params.from_date, to_date: params.to_date, lab_name: 'Demo Lab', summary: { total_doctors: 0, total_patients: 0, total_billing: 0, total_commission: 0 }, records: [] };
+  },
+
+  getCommissionExportPDFUrl(labId: string, params: {
+    type: 'consolidated' | 'doctor_wise';
+    from_date: string;
+    to_date: string;
+    doctor_id?: string;
+    include_patients?: boolean;
+  }): string {
+    const queryParams = new URLSearchParams({
+      lab_id: labId,
+      type: params.type,
+      from_date: params.from_date,
+      to_date: params.to_date,
+    });
+    if (params.doctor_id) queryParams.set('doctor_id', params.doctor_id);
+    if (params.include_patients) queryParams.set('include_patients', 'true');
+    return `${API_URL}/commission/export-pdf/?${queryParams.toString()}`;
+  },
+
+  getCommissionExportExcelUrl(labId: string, params: {
+    type: 'consolidated' | 'doctor_wise';
+    from_date: string;
+    to_date: string;
+    doctor_id?: string;
+    include_patients?: boolean;
+  }): string {
+    const queryParams = new URLSearchParams({
+      lab_id: labId,
+      type: params.type,
+      from_date: params.from_date,
+      to_date: params.to_date,
+    });
+    if (params.doctor_id) queryParams.set('doctor_id', params.doctor_id);
+    if (params.include_patients) queryParams.set('include_patients', 'true');
+    return `${API_URL}/commission/export-excel/?${queryParams.toString()}`;
+  },
+
+  async getInformativeReportsList(): Promise<any[]> {
+    if (!IS_MOCK) {
+      const res = await authFetch(`${API_URL}/informative-reports/`);
+      if (!res.ok) throw new Error('Failed to load reports list.');
+      return res.json();
+    }
+    return [];
+  },
+
+  async getInformativeReportPreview(labId: string, reportId: string, params: any): Promise<any> {
+    if (!IS_MOCK) {
+      const queryParams = new URLSearchParams({
+        lab_id: labId,
+        report_id: reportId,
+        ...params
+      });
+      const res = await authFetch(`${API_URL}/informative-reports/preview/?${queryParams.toString()}`);
+      if (!res.ok) throw new Error('Failed to load report preview.');
+      return res.json();
+    }
+    return { records: [], summary: {}, lab_name: 'Demo Lab' };
+  },
+
+  getInformativeReportExportUrl(labId: string, reportId: string, format: 'pdf' | 'excel', params: any): string {
+    const queryParams = new URLSearchParams({
+      lab_id: labId,
+      report_id: reportId,
+      format,
+      ...params
+    });
+    return `${API_URL}/informative-reports/export/?${queryParams.toString()}`;
   }
 };
+

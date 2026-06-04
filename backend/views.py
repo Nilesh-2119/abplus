@@ -15,7 +15,8 @@ from django.utils import timezone
 from .models import (
     Lab, ActivityLog, MasterTest, MasterTestParameter, 
     LabTest, LabTestParameter, PatientEntry, Expense, LabSettings, ReferredDoctor,
-    Payment, Concession, Report, CashierReceipt, DailyCloseout, PaymentTransaction, CashierAdminSettlement
+    Payment, Concession, Report, CashierReceipt, DailyCloseout, PaymentTransaction, CashierAdminSettlement,
+    DoctorCommissionEntry
 )
 from .serializers import (
     LabSerializer,
@@ -757,11 +758,11 @@ class PatientViewSet(SoftDeleteViewSetMixin, viewsets.ModelViewSet):
                 if lab_id:
                     queryset = queryset.filter(lab_id=lab_id)
             
-            # 2. Scope view permissions by role
+            # 2. Scope view permissions by role (Collection boy only sees patients they created/collected across all statuses)
             role = self.request.user.role
             if role == 'COLLECTION_BOY':
                 from django.db.models import Q
-                queryset = queryset.filter(status__in=['CREATED', 'COLLECTED']).filter(
+                queryset = queryset.filter(
                     Q(created_by=self.request.user) | 
                     Q(collected_by__iexact=self.request.user.username) | 
                     Q(collected_by__iexact=f"{self.request.user.first_name} {self.request.user.last_name}".strip())
@@ -772,8 +773,6 @@ class PatientViewSet(SoftDeleteViewSetMixin, viewsets.ModelViewSet):
             role = self.request.query_params.get('role')
             if lab_id:
                 queryset = queryset.filter(lab_id=lab_id)
-            if role == 'COLLECTION_BOY':
-                queryset = queryset.filter(status__in=['CREATED', 'COLLECTED'])
 
         if search:
             from django.db.models import Q
@@ -1191,6 +1190,39 @@ class ReferredDoctorViewSet(SoftDeleteViewSetMixin, viewsets.ModelViewSet):
 
         return Response(ReferredDoctorSerializer(doctor).data)
 
+    @action(detail=True, methods=['get'], url_path='stats')
+    def stats(self, request, pk=None):
+        doctor = self.get_object()
+        from django.utils import timezone
+        from django.db.models import Sum
+        
+        today = timezone.localdate()
+        first_day_of_month = today.replace(day=1)
+        first_day_of_year = today.replace(month=1, day=1)
+
+        patient_queryset = doctor.patients.filter(delete_flag='N')
+
+        total_patients = patient_queryset.count()
+        total_revenue = patient_queryset.aggregate(total=Sum('total_bill'))['total'] or 0.0
+        
+        first_referral = patient_queryset.order_by('created_at').first()
+        last_referral = patient_queryset.order_by('-created_at').first()
+        
+        first_referral_date = first_referral.created_at if first_referral else None
+        last_referral_date = last_referral.created_at if last_referral else None
+        
+        patients_this_month = patient_queryset.filter(created_at__gte=first_day_of_month).count()
+        patients_this_year = patient_queryset.filter(created_at__gte=first_day_of_year).count()
+
+        return Response({
+            "total_patients": total_patients,
+            "total_revenue": float(total_revenue),
+            "first_referral_date": first_referral_date.isoformat() if first_referral_date else None,
+            "last_referral_date": last_referral_date.isoformat() if last_referral_date else None,
+            "patients_this_month": patients_this_month,
+            "patients_this_year": patients_this_year
+        })
+
 
 class LoginView(views.APIView):
     """
@@ -1308,6 +1340,135 @@ class ChangePasswordView(views.APIView):
         return Response({"success": True})
 
 
+def get_or_create_daily_snapshots(user, target_date, lab_id):
+    """
+    Computes or retrieves daily cash snapshots for a Collection Boy sequentially from their
+    earliest activity up to the target date.
+    Returns the snapshot for the target date.
+    """
+    import datetime as _dt
+    from django.db.models import Min, Sum
+    from django.utils import timezone
+    from backend.models import DailyCashSnapshot, PaymentTransaction, Expense, CashierReceipt
+    
+    # 1. Parse target_date to datetime.date if it is string
+    if isinstance(target_date, str):
+        try:
+            target_date = _dt.date.fromisoformat(target_date)
+        except ValueError:
+            target_date = timezone.now().date()
+            
+    today_date = timezone.now().date()
+
+    # 2. Find earliest activity date for user
+    min_date = None
+    
+    # Check earliest PaymentTransaction
+    p_min = PaymentTransaction.objects.filter(
+        collection_boy=user,
+        delete_flag='N'
+    ).aggregate(min_val=Min('transaction_date'))['min_val']
+    if p_min:
+        min_date = p_min
+        
+    # Check earliest Expense
+    e_min = Expense.objects.filter(
+        lab_id=lab_id,
+        created_by__iexact=user.username,
+        delete_flag='N'
+    ).aggregate(min_val=Min('date'))['min_val']
+    if e_min:
+        min_date = min(min_date, e_min) if min_date else e_min
+        
+    # Check earliest CashierReceipt
+    r_min = CashierReceipt.objects.filter(
+        collection_boy=user,
+        delete_flag='N'
+    ).aggregate(min_val=Min('receipt_date'))['min_val']
+    if r_min:
+        min_date = min(min_date, r_min) if min_date else r_min
+        
+    if not min_date or min_date > target_date:
+        min_date = target_date
+
+    # Ensure min_date is date instance
+    if isinstance(min_date, str):
+        min_date = _dt.date.fromisoformat(min_date)
+
+    # 3. Iterate day-by-day from min_date to target_date
+    current_date = min_date
+    while current_date <= target_date:
+        # Check if snapshot exists for current_date
+        snapshot = DailyCashSnapshot.objects.filter(
+            user=user,
+            snapshot_date=current_date,
+            delete_flag='N'
+        ).first()
+        
+        # If it exists and current_date < today_date, keep it! Do not recalculate.
+        # But if it is today_date or in the future, or if it doesn't exist, we must calculate/recalculate it.
+        if snapshot and current_date < today_date:
+            current_date += _dt.timedelta(days=1)
+            continue
+            
+        # Calculate opening balance:
+        # It must be previous_day.closing_cash_balance (or 0.0 if there is no previous day)
+        prev_snapshot = DailyCashSnapshot.objects.filter(
+            user=user,
+            snapshot_date__lt=current_date,
+            delete_flag='N'
+        ).order_by('-snapshot_date').first()
+        
+        opening_cash_balance = float(prev_snapshot.closing_cash_balance) if prev_snapshot else 0.0
+        
+        # Today's Collection
+        cash_collected_today = float(PaymentTransaction.objects.filter(
+            collection_boy=user,
+            transaction_date=current_date,
+            delete_flag='N'
+        ).aggregate(total=Sum('amount_received'))['total'] or 0.0)
+        
+        # Today's Expenses
+        expenses_today = float(Expense.objects.filter(
+            lab_id=lab_id,
+            created_by__iexact=user.username,
+            date=current_date,
+            delete_flag='N'
+        ).aggregate(total=Sum('amount'))['total'] or 0.0)
+        
+        # Today's Submitted cash
+        cash_submitted_today = float(CashierReceipt.objects.filter(
+            collection_boy=user,
+            receipt_date=current_date,
+            delete_flag='N'
+        ).aggregate(total=Sum('amount_received'))['total'] or 0.0)
+        
+        # Closing Cash Balance Formula
+        closing_cash_balance = opening_cash_balance + cash_collected_today - expenses_today - cash_submitted_today
+        
+        # Upsert the daily snapshot record
+        DailyCashSnapshot.objects.update_or_create(
+            user=user,
+            snapshot_date=current_date,
+            defaults={
+                'opening_cash_balance': opening_cash_balance,
+                'cash_collected_today': cash_collected_today,
+                'expenses_today': expenses_today,
+                'cash_submitted_today': cash_submitted_today,
+                'closing_cash_balance': closing_cash_balance,
+                'delete_flag': 'N'
+            }
+        )
+        
+        current_date += _dt.timedelta(days=1)
+
+    # Return the snapshot for the target_date
+    return DailyCashSnapshot.objects.filter(
+        user=user,
+        snapshot_date=target_date,
+        delete_flag='N'
+    ).first()
+
 
 class CollectionDashboardStatsView(views.APIView):
     """
@@ -1422,6 +1583,9 @@ class CollectionDashboardStatsView(views.APIView):
             from django.db.models import Q, OuterRef, Subquery, DecimalField, Value
             from django.db.models.functions import Coalesce
 
+            # Ensure all intermediate daily snapshots are created and get/update target day snapshot
+            snapshot = get_or_create_daily_snapshots(resolved_boy, selected_date, lab_id)
+
             # 1. Today's concessions (date-specific)
             concession_totals = float(PaymentTransaction.objects.filter(
                 collection_boy=resolved_boy,
@@ -1429,30 +1593,12 @@ class CollectionDashboardStatsView(views.APIView):
                 delete_flag='N'
             ).aggregate(total=Sum('concession_amount'))['total'] or 0.0)
 
-            # 2. Today's collected cash (date-specific — cash collected on selected date only)
-            todays_collected = float(PaymentTransaction.objects.filter(
-                collection_boy=resolved_boy,
-                transaction_date=selected_date,
-                delete_flag='N'
-            ).aggregate(total=Sum('amount_received'))['total'] or 0.0)
-
-            # 3. Cash Not Submitted (cumulative BEFORE selected date D — excludes today's collection)
-            #    = cash collected STRICTLY BEFORE selected date D that was NOT submitted on or before selected date D
-            #    This way: Net Cash In Hand = cash_not_submitted (pending from past days) + todays_collected (new today)
-            cash_not_submitted = float(PaymentTransaction.objects.filter(
-                collection_boy=resolved_boy,
-                transaction_date__lt=selected_date,   # strictly BEFORE today — excludes today's collection
-                delete_flag='N'
-            ).filter(
-                Q(submitted_to_cashier='N') | Q(cashier_received_at__date__gt=selected_date)
-            ).aggregate(total=Sum('amount_received'))['total'] or 0.0)
-
-            # 4. Submitted Cash on selected date (reconciled by CashierReceipt where receipt_date == selected_date)
-            submitted_cash_today = float(CashierReceipt.objects.filter(
-                collection_boy=resolved_boy,
-                receipt_date=selected_date,
-                delete_flag='N'
-            ).aggregate(total=Sum('amount_received'))['total'] or 0.0)
+            # Assign values from the snapshot
+            todays_collected = float(snapshot.cash_collected_today) if snapshot else 0.0
+            cash_not_submitted = float(snapshot.opening_cash_balance) if snapshot else 0.0
+            submitted_cash_today = float(snapshot.cash_submitted_today) if snapshot else 0.0
+            today_expenses = float(snapshot.expenses_today) if snapshot else 0.0
+            net_cash_in_hand = float(snapshot.closing_cash_balance) if snapshot else 0.0
 
             # 5. Expenses up to selected date (cumulative unsubmitted expenses)
             unsubmitted_expenses = float(Expense.objects.filter(
@@ -1463,22 +1609,6 @@ class CollectionDashboardStatsView(views.APIView):
                 cashier_admin_settlement__isnull=True,
                 delete_flag='N'
             ).aggregate(total=Sum('amount'))['total'] or 0.0)
-
-            # 5b. Today's expenses (date-specific)
-            today_expenses = float(Expense.objects.filter(
-                lab_id=lab_id,
-                created_by__iexact=resolved_boy.username,
-                date=selected_date,
-                delete_flag='N'
-            ).aggregate(total=Sum('amount'))['total'] or 0.0)
-
-            # 6. Net Cash In Hand = pending cash from past days + today's collection - submitted today - today's expenses
-            #    Formula: cash_not_submitted (before today) + todays_collected - submitted_cash_today - today_expenses
-            #    We use today_expenses (not unsubmitted_expenses) because the boy physically spent that cash regardless
-            #    of whether it was linked to a receipt — money spent is money gone from hand.
-            #    Example on May 29: ₹0 (no prior pending) + ₹2200 (collected) - ₹1500 (submitted) - ₹100 (expenses) = ₹600 carry-forward
-            #    Example on May 30: ₹600 (pending from 29th) + ₹500 (today) - ₹0 (not yet submitted) - ₹0 (expenses) = ₹1100 in hand
-            net_cash_in_hand = max(0.0, cash_not_submitted + todays_collected - submitted_cash_today - today_expenses)
 
             # 7. Total Pending Receivables & Patients (cumulative up to selected date D)
             boy_patients_cumulative = PatientEntry.objects.filter(
@@ -1751,5 +1881,1325 @@ class CashierAdminSettlementViewSet(viewsets.ModelViewSet):
         serializer = self.get_serializer(settlement)
         return Response(serializer.data, status=status.HTTP_201_CREATED)
 
+
+class CommissionDashboardStatsView(views.APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        if request.user.role != 'LAB_ADMIN' and not request.user.is_superuser:
+            return Response({"detail": "Permission denied. Only Lab Admins can view commission statistics."}, status=status.HTTP_403_FORBIDDEN)
+        
+        lab = request.user.lab
+        if not lab and request.user.is_superuser:
+            lab_id = request.query_params.get('lab_id')
+            if lab_id:
+                from .models import Lab
+                lab = Lab.objects.filter(id=lab_id).first()
+        
+        if not lab:
+            return Response({"error": "No lab associated with user."}, status=status.HTTP_400_BAD_REQUEST)
+            
+        from django.db.models import Sum, Count
+        from django.utils import timezone
+        
+        today = timezone.localdate()
+        start_of_month = today.replace(day=1)
+        
+        # 1. Total Commission Earned (Current Month)
+        total_earned = DoctorCommissionEntry.objects.filter(
+            lab=lab,
+            delete_flag='N',
+            entry_date__gte=start_of_month,
+            entry_date__lte=today
+        ).aggregate(total=Sum('commission_amount'))['total'] or 0.0
+        
+        # 2. Total Referring Doctors with referrals (Current Month)
+        doctors_count = DoctorCommissionEntry.objects.filter(
+            lab=lab,
+            delete_flag='N',
+            entry_date__gte=start_of_month,
+            entry_date__lte=today
+        ).values('doctor').distinct().count()
+        
+        # 3. Unpaid (Pending) Commission (All time)
+        pending_commission = DoctorCommissionEntry.objects.filter(
+            lab=lab,
+            delete_flag='N',
+            is_paid=False
+        ).aggregate(total=Sum('commission_amount'))['total'] or 0.0
+        
+        # 4. Top Referring Doctor details (Current Month)
+        top_doctor_entry = DoctorCommissionEntry.objects.filter(
+            lab=lab,
+            delete_flag='N',
+            entry_date__gte=start_of_month,
+            entry_date__lte=today
+        ).values('doctor', 'doctor__doctor_name', 'doctor__hospital_name').annotate(
+            total_comm=Sum('commission_amount'),
+            patient_count=Count('patient', distinct=True)
+        ).order_by('-total_comm').first()
+        
+        top_doctor = None
+        if top_doctor_entry:
+            top_doctor = {
+                "id": top_doctor_entry['doctor'],
+                "name": top_doctor_entry['doctor__doctor_name'],
+                "hospital": top_doctor_entry['doctor__hospital_name'],
+                "total_commission": float(top_doctor_entry['total_comm']),
+                "patient_count": top_doctor_entry['patient_count']
+            }
+            
+        return Response({
+            "total_earned": float(total_earned),
+            "doctors_count": doctors_count,
+            "pending_commission": float(pending_commission),
+            "top_doctor": top_doctor
+        })
+
+
+class CommissionReportsView(views.APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        if request.user.role != 'LAB_ADMIN' and not request.user.is_superuser:
+            return Response({"detail": "Permission denied."}, status=status.HTTP_403_FORBIDDEN)
+        
+        lab = request.user.lab
+        if not lab and request.user.is_superuser:
+            lab_id = request.query_params.get('lab_id')
+            if lab_id:
+                from .models import Lab
+                lab = Lab.objects.filter(id=lab_id).first()
+        if not lab:
+            return Response({"error": "No lab associated with user."}, status=status.HTTP_400_BAD_REQUEST)
+            
+        from django.db.models import Sum, Count, Q
+        from django.utils import timezone
+        
+        today = timezone.localdate()
+        try:
+            month = int(request.query_params.get('month', today.month))
+            year = int(request.query_params.get('year', today.year))
+        except ValueError:
+            month = today.month
+            year = today.year
+            
+        doctor_id = request.query_params.get('doctor_id')
+        
+        queryset = DoctorCommissionEntry.objects.filter(
+            lab=lab,
+            delete_flag='N',
+            entry_date__month=month,
+            entry_date__year=year
+        )
+        
+        if doctor_id:
+            queryset = queryset.filter(doctor_id=doctor_id)
+            
+        # Group by doctor and calculate summary metrics
+        reports = queryset.values(
+            'doctor',
+            'doctor__doctor_name',
+            'doctor__hospital_name'
+        ).annotate(
+            patient_count=Count('patient', distinct=True),
+            total_revenue=Sum('test_price'),
+            total_commission=Sum('commission_amount'),
+            unpaid_commission=Sum('commission_amount', filter=Q(is_paid=False)),
+            paid_commission=Sum('commission_amount', filter=Q(is_paid=True))
+        ).order_by('-total_commission')
+        
+        report_data = []
+        for r in reports:
+            report_data.append({
+                "doctor_id": r['doctor'],
+                "doctor_name": r['doctor__doctor_name'],
+                "hospital_name": r['doctor__hospital_name'],
+                "patient_count": r['patient_count'],
+                "total_revenue": float(r['total_revenue'] or 0),
+                "total_commission": float(r['total_commission'] or 0),
+                "unpaid_commission": float(r['unpaid_commission'] or 0),
+                "paid_commission": float(r['paid_commission'] or 0),
+            })
+            
+        return Response(report_data)
+
+
+class CommissionSettleView(views.APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        if request.user.role != 'LAB_ADMIN' and not request.user.is_superuser:
+            return Response({"detail": "Permission denied."}, status=status.HTTP_403_FORBIDDEN)
+        
+        lab = request.user.lab
+        if not lab and request.user.is_superuser:
+            lab_id = request.data.get('lab_id')
+            if lab_id:
+                from .models import Lab
+                lab = Lab.objects.filter(id=lab_id).first()
+        if not lab:
+            return Response({"error": "No lab associated with user."}, status=status.HTTP_400_BAD_REQUEST)
+
+        doctor_id = request.data.get('doctor_id')
+        month = request.data.get('month')
+        year = request.data.get('year')
+
+        if not doctor_id or not month or not year:
+            return Response({"error": "doctor_id, month, and year are required."}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            month = int(month)
+            year = int(year)
+        except ValueError:
+            return Response({"error": "Invalid month or year."}, status=status.HTTP_400_BAD_REQUEST)
+
+        updated_count = DoctorCommissionEntry.objects.filter(
+            lab=lab,
+            doctor_id=doctor_id,
+            entry_date__month=month,
+            entry_date__year=year,
+            is_paid=False,
+            delete_flag='N'
+        ).update(is_paid=True)
+
+        return Response({
+            "message": f"Successfully settled {updated_count} commission entries.",
+            "settled_count": updated_count
+        })
+
+
+class DoctorCommissionDetailView(views.APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, doctor_id):
+        if request.user.role != 'LAB_ADMIN' and not request.user.is_superuser:
+            return Response({"detail": "Permission denied."}, status=status.HTTP_403_FORBIDDEN)
+        
+        lab = request.user.lab
+        if not lab and request.user.is_superuser:
+            lab_id = request.query_params.get('lab_id')
+            if lab_id:
+                from .models import Lab
+                lab = Lab.objects.filter(id=lab_id).first()
+        if not lab:
+            return Response({"error": "No lab associated with user."}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Check if doctor belongs to the lab (unless superuser)
+        doctor = ReferredDoctor.objects.filter(id=doctor_id, delete_flag='N').first()
+        if not doctor:
+            return Response({"error": "Doctor not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        month = request.query_params.get('month')
+        year = request.query_params.get('year')
+
+        queryset = DoctorCommissionEntry.objects.filter(
+            lab=lab,
+            doctor=doctor,
+            delete_flag='N'
+        ).select_related('patient', 'test')
+
+        if month and year:
+            try:
+                queryset = queryset.filter(entry_date__month=int(month), entry_date__year=int(year))
+            except ValueError:
+                pass
+
+        details = []
+        for entry in queryset:
+            details.append({
+                "id": entry.id,
+                "patient_id": entry.patient.id,
+                "patient_name": entry.patient.name,
+                "patient_code": entry.patient.id,
+                "test_id": entry.test.id,
+                "test_name": entry.test.name,
+                "test_price": float(entry.test_price),
+                "commission_percentage": float(entry.commission_percentage),
+                "commission_amount": float(entry.commission_amount),
+                "entry_date": entry.entry_date.isoformat(),
+                "is_paid": entry.is_paid,
+                "created_at": entry.created_at.isoformat()
+            })
+
+        # Calculate summary totals for convenience
+        total_revenue = sum(d['test_price'] for d in details)
+        total_commission = sum(d['commission_amount'] for d in details)
+        unpaid_commission = sum(d['commission_amount'] for d in details if not d['is_paid'])
+        paid_commission = sum(d['commission_amount'] for d in details if d['is_paid'])
+
+        return Response({
+            "doctor_id": doctor.id,
+            "doctor_name": doctor.doctor_name,
+            "hospital_name": doctor.hospital_name,
+            "summary": {
+                "total_revenue": total_revenue,
+                "total_commission": total_commission,
+                "unpaid_commission": unpaid_commission,
+                "paid_commission": paid_commission,
+                "patient_count": len(set(d['patient_id'] for d in details))
+            },
+            "entries": details
+        })
+
+
+# ─── Commission Report Export Views ────────────────────────────────────
+
+class CommissionReportPreviewView(views.APIView):
+    """JSON preview of commission report data (consolidated or doctor-wise)."""
+    permission_classes = [IsAuthenticated]
+
+    def _resolve_lab(self, request):
+        lab = request.user.lab
+        if not lab and request.user.is_superuser:
+            lab_id = request.query_params.get('lab_id')
+            if lab_id:
+                from .models import Lab
+                lab = Lab.objects.filter(id=lab_id).first()
+        return lab
+
+    def get(self, request):
+        if request.user.role != 'LAB_ADMIN' and not request.user.is_superuser:
+            return Response({"detail": "Permission denied. Only Lab Admins can generate commission reports."}, status=status.HTTP_403_FORBIDDEN)
+
+        lab = self._resolve_lab(request)
+        if not lab:
+            return Response({"error": "No lab associated with user."}, status=status.HTTP_400_BAD_REQUEST)
+
+        report_type = request.query_params.get('type', 'consolidated')
+        from_date_str = request.query_params.get('from_date')
+        to_date_str = request.query_params.get('to_date')
+        doctor_id = request.query_params.get('doctor_id')
+        include_patients = request.query_params.get('include_patients', 'false').lower() == 'true'
+
+        if not from_date_str or not to_date_str:
+            return Response({"error": "from_date and to_date are required."}, status=status.HTTP_400_BAD_REQUEST)
+
+        from datetime import datetime as dt
+        try:
+            from_date = dt.strptime(from_date_str, '%Y-%m-%d').date()
+            to_date = dt.strptime(to_date_str, '%Y-%m-%d').date()
+        except ValueError:
+            return Response({"error": "Invalid date format. Use YYYY-MM-DD."}, status=status.HTTP_400_BAD_REQUEST)
+
+        if from_date > to_date:
+            return Response({"error": "from_date cannot be greater than to_date."}, status=status.HTTP_400_BAD_REQUEST)
+
+        from django.db.models import Sum, Count
+
+        base_qs = DoctorCommissionEntry.objects.filter(
+            lab=lab, delete_flag='N',
+            entry_date__gte=from_date, entry_date__lte=to_date
+        )
+
+        if report_type == 'doctor_wise':
+            if not doctor_id:
+                return Response({"error": "doctor_id is required for doctor_wise report."}, status=status.HTTP_400_BAD_REQUEST)
+            base_qs = base_qs.filter(doctor_id=doctor_id)
+            doctor = ReferredDoctor.objects.filter(id=doctor_id, delete_flag='N').first()
+            if not doctor:
+                return Response({"error": "Doctor not found."}, status=status.HTTP_404_NOT_FOUND)
+
+            if include_patients:
+                entries = base_qs.select_related('patient', 'test')
+                patient_map = {}
+                for e in entries:
+                    pid = e.patient_id
+                    if pid not in patient_map:
+                        patient_map[pid] = {
+                            "patient_id": pid,
+                            "patient_name": e.patient.name,
+                            "patient_code": e.patient.id,
+                            "registration_date": e.entry_date.isoformat(),
+                            "tests": [],
+                            "billing_amount": 0.0,
+                            "commission_amount": 0.0,
+                        }
+                    patient_map[pid]["tests"].append(e.test.name)
+                    patient_map[pid]["billing_amount"] += float(e.test_price)
+                    patient_map[pid]["commission_amount"] += float(e.commission_amount)
+                    if e.entry_date.isoformat() < patient_map[pid]["registration_date"]:
+                        patient_map[pid]["registration_date"] = e.entry_date.isoformat()
+
+                records = []
+                total_billing = 0
+                total_commission = 0
+                for pid, pdata in patient_map.items():
+                    pdata["tests_performed"] = ", ".join(pdata["tests"])
+                    del pdata["tests"]
+                    records.append(pdata)
+                    total_billing += pdata["billing_amount"]
+                    total_commission += pdata["commission_amount"]
+
+                records.sort(key=lambda x: (x["registration_date"], x["patient_name"]))
+
+                return Response({
+                    "report_type": "doctor_wise_detailed",
+                    "from_date": from_date_str,
+                    "to_date": to_date_str,
+                    "lab_name": lab.name,
+                    "doctor": {"id": doctor.id, "name": doctor.doctor_name, "hospital": doctor.hospital_name},
+                    "summary": {"total_patients": len(records), "total_billing": total_billing, "total_commission": total_commission},
+                    "records": records,
+                })
+            else:
+                agg = base_qs.aggregate(
+                    total_patients=Count('patient', distinct=True),
+                    total_billing=Sum('test_price'),
+                    total_commission=Sum('commission_amount'),
+                )
+                return Response({
+                    "report_type": "doctor_wise",
+                    "from_date": from_date_str,
+                    "to_date": to_date_str,
+                    "lab_name": lab.name,
+                    "doctor": {"id": doctor.id, "name": doctor.doctor_name, "hospital": doctor.hospital_name},
+                    "summary": {
+                        "total_patients": agg['total_patients'] or 0,
+                        "total_billing": float(agg['total_billing'] or 0),
+                        "total_commission": float(agg['total_commission'] or 0),
+                    },
+                    "records": [{
+                        "doctor_id": doctor.id,
+                        "doctor_name": doctor.doctor_name,
+                        "hospital_name": doctor.hospital_name,
+                        "patient_count": agg['total_patients'] or 0,
+                        "referral_billing": float(agg['total_billing'] or 0),
+                        "total_commission": float(agg['total_commission'] or 0),
+                    }]
+                })
+        else:
+            # Consolidated
+            doctor_groups = base_qs.values(
+                'doctor', 'doctor__doctor_name', 'doctor__hospital_name'
+            ).annotate(
+                patient_count=Count('patient', distinct=True),
+                referral_billing=Sum('test_price'),
+                total_commission=Sum('commission_amount'),
+            ).order_by('-total_commission')
+
+            records = []
+            total_patients_all = 0
+            total_billing_all = 0
+            total_commission_all = 0
+            for dg in doctor_groups:
+                pc = dg['patient_count'] or 0
+                rb = float(dg['referral_billing'] or 0)
+                tc = float(dg['total_commission'] or 0)
+                total_patients_all += pc
+                total_billing_all += rb
+                total_commission_all += tc
+                records.append({
+                    "doctor_id": dg['doctor'],
+                    "doctor_name": dg['doctor__doctor_name'],
+                    "hospital_name": dg['doctor__hospital_name'],
+                    "patient_count": pc,
+                    "referral_billing": rb,
+                    "total_commission": tc,
+                })
+            return Response({
+                "report_type": "consolidated",
+                "from_date": from_date_str,
+                "to_date": to_date_str,
+                "lab_name": lab.name,
+                "summary": {
+                    "total_doctors": len(records),
+                    "total_patients": total_patients_all,
+                    "total_billing": total_billing_all,
+                    "total_commission": total_commission_all,
+                },
+                "records": records,
+            })
+
+
+class CommissionReportPDFView(views.APIView):
+    """Generate and stream a professional PDF commission report."""
+    permission_classes = [IsAuthenticated]
+
+    def _resolve_lab(self, request):
+        lab = request.user.lab
+        if not lab and request.user.is_superuser:
+            lab_id = request.query_params.get('lab_id')
+            if lab_id:
+                from .models import Lab
+                lab = Lab.objects.filter(id=lab_id).first()
+        return lab
+
+    def get(self, request):
+        if request.user.role != 'LAB_ADMIN' and not request.user.is_superuser:
+            return Response({"detail": "Permission denied."}, status=status.HTTP_403_FORBIDDEN)
+
+        lab = self._resolve_lab(request)
+        if not lab:
+            return Response({"error": "No lab associated with user."}, status=status.HTTP_400_BAD_REQUEST)
+
+        report_type = request.query_params.get('type', 'consolidated')
+        from_date_str = request.query_params.get('from_date')
+        to_date_str = request.query_params.get('to_date')
+        doctor_id = request.query_params.get('doctor_id')
+        include_patients = request.query_params.get('include_patients', 'false').lower() == 'true'
+
+        if not from_date_str or not to_date_str:
+            return Response({"error": "from_date and to_date are required."}, status=status.HTTP_400_BAD_REQUEST)
+
+        from datetime import datetime as dt
+        try:
+            from_date = dt.strptime(from_date_str, '%Y-%m-%d').date()
+            to_date = dt.strptime(to_date_str, '%Y-%m-%d').date()
+        except ValueError:
+            return Response({"error": "Invalid date format."}, status=status.HTTP_400_BAD_REQUEST)
+
+        if from_date > to_date:
+            return Response({"error": "from_date cannot be greater than to_date."}, status=status.HTTP_400_BAD_REQUEST)
+
+        from django.db.models import Sum, Count
+        import io
+        from reportlab.lib import colors
+        from reportlab.lib.pagesizes import A4, landscape
+        from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+        from reportlab.lib.units import inch, mm
+        from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, HRFlowable
+        from reportlab.lib.enums import TA_RIGHT, TA_CENTER, TA_LEFT
+
+        base_qs = DoctorCommissionEntry.objects.filter(
+            lab=lab, delete_flag='N',
+            entry_date__gte=from_date, entry_date__lte=to_date
+        )
+
+        teal = colors.HexColor('#0d9488')
+        dark_slate = colors.HexColor('#1e293b')
+        light_bg = colors.HexColor('#f1f5f9')
+        white = colors.white
+
+        buffer = io.BytesIO()
+        page_size = landscape(A4) if report_type == 'consolidated' else A4
+        doc = SimpleDocTemplate(buffer, pagesize=page_size, leftMargin=20*mm, rightMargin=20*mm, topMargin=25*mm, bottomMargin=20*mm)
+
+        styles = getSampleStyleSheet()
+        title_style = ParagraphStyle('Title', parent=styles['Heading1'], fontSize=18, textColor=dark_slate, spaceAfter=4)
+        subtitle_style = ParagraphStyle('Subtitle', parent=styles['Normal'], fontSize=10, textColor=colors.HexColor('#64748b'), spaceAfter=12)
+        meta_style = ParagraphStyle('Meta', parent=styles['Normal'], fontSize=9, textColor=colors.HexColor('#475569'))
+        summary_style = ParagraphStyle('Summary', parent=styles['Normal'], fontSize=11, textColor=dark_slate, spaceBefore=8, spaceAfter=4)
+
+        elements = []
+
+        # Header
+        elements.append(Paragraph(f"{lab.name}", title_style))
+        elements.append(Paragraph("AB+ Diagnostics — Commission Report", subtitle_style))
+        elements.append(HRFlowable(width="100%", thickness=1.5, color=teal, spaceAfter=10))
+
+        # Metadata
+        now_str = dt.now().strftime('%d %b %Y, %I:%M %p')
+        report_label = "Consolidated Report" if report_type == 'consolidated' else "Doctor Wise Report"
+        elements.append(Paragraph(f"<b>Report Type:</b> {report_label} &nbsp;&nbsp; | &nbsp;&nbsp; <b>Period:</b> {from_date_str} to {to_date_str} &nbsp;&nbsp; | &nbsp;&nbsp; <b>Generated:</b> {now_str}", meta_style))
+        elements.append(Spacer(1, 12))
+
+        if report_type == 'doctor_wise' and doctor_id:
+            base_qs = base_qs.filter(doctor_id=doctor_id)
+            doctor = ReferredDoctor.objects.filter(id=doctor_id, delete_flag='N').first()
+            if doctor:
+                elements.append(Paragraph(f"<b>Doctor:</b> {doctor.doctor_name} &nbsp;&nbsp; | &nbsp;&nbsp; <b>Hospital:</b> {doctor.hospital_name}", meta_style))
+                elements.append(Spacer(1, 8))
+
+            if include_patients:
+                entries = base_qs.select_related('patient', 'test')
+                patient_map = {}
+                for e in entries:
+                    pid = e.patient_id
+                    if pid not in patient_map:
+                        patient_map[pid] = {
+                            "name": e.patient.name,
+                            "code": e.patient.id,
+                            "date": e.entry_date,
+                            "tests": [],
+                            "billing": 0.0,
+                            "commission": 0.0,
+                        }
+                    patient_map[pid]["tests"].append(e.test.name)
+                    patient_map[pid]["billing"] += float(e.test_price)
+                    patient_map[pid]["commission"] += float(e.commission_amount)
+                    if e.entry_date < patient_map[pid]["date"]:
+                        patient_map[pid]["date"] = e.entry_date
+
+                records = list(patient_map.values())
+                records.sort(key=lambda x: (x["date"], x["name"]))
+
+                cell_style = ParagraphStyle(
+                    'CellWrap',
+                    parent=styles['Normal'],
+                    fontSize=8,
+                    leading=10,
+                    textColor=dark_slate
+                )
+
+                headers = ['Patient Name', 'Patient Code', 'Date', 'Test', 'Billing (₹)', 'Commission (₹)']
+                data = [headers]
+                total_billing = 0
+                total_commission = 0
+                for r in records:
+                    total_billing += r["billing"]
+                    total_commission += r["commission"]
+                    data.append([
+                        Paragraph(r["name"], cell_style),
+                        r["code"],
+                        r["date"].strftime('%d/%m/%Y'),
+                        Paragraph(", ".join(r["tests"]), cell_style),
+                        f"₹{r['billing']:,.2f}",
+                        f"₹{r['commission']:,.2f}",
+                    ])
+                # Summary row
+                data.append(['', '', '', 'TOTAL', f"₹{total_billing:,.2f}", f"₹{total_commission:,.2f}"])
+                col_widths = [120, 80, 70, 120, 80, 80]
+            else:
+                agg = base_qs.aggregate(
+                    patient_count=Count('patient', distinct=True),
+                    total_billing=Sum('test_price'),
+                    total_commission=Sum('commission_amount'),
+                )
+                headers = ['Doctor Name', 'Hospital', 'Patients', 'Billing (₹)', 'Commission (₹)']
+                data = [headers]
+                tb = float(agg['total_billing'] or 0)
+                tc = float(agg['total_commission'] or 0)
+                data.append([
+                    doctor.doctor_name if doctor else 'N/A',
+                    doctor.hospital_name if doctor else 'N/A',
+                    str(agg['patient_count'] or 0),
+                    f"₹{tb:,.2f}",
+                    f"₹{tc:,.2f}",
+                ])
+                data.append(['', '', 'TOTAL', f"₹{tb:,.2f}", f"₹{tc:,.2f}"])
+                col_widths = [140, 140, 60, 100, 100]
+        else:
+            # Consolidated
+            doctor_groups = base_qs.values(
+                'doctor', 'doctor__doctor_name', 'doctor__hospital_name'
+            ).annotate(
+                patient_count=Count('patient', distinct=True),
+                referral_billing=Sum('test_price'),
+                total_commission=Sum('commission_amount'),
+            ).order_by('-total_commission')
+
+            headers = ['Doctor Name', 'Hospital', 'Patients', 'Billing (₹)', 'Commission (₹)']
+            data = [headers]
+            total_billing = 0
+            total_commission = 0
+            for dg in doctor_groups:
+                rb = float(dg['referral_billing'] or 0)
+                tc = float(dg['total_commission'] or 0)
+                total_billing += rb
+                total_commission += tc
+                data.append([
+                    dg['doctor__doctor_name'],
+                    dg['doctor__hospital_name'],
+                    str(dg['patient_count'] or 0),
+                    f"₹{rb:,.2f}",
+                    f"₹{tc:,.2f}",
+                ])
+            data.append(['', '', 'TOTAL', f"₹{total_billing:,.2f}", f"₹{total_commission:,.2f}"])
+            col_widths = [150, 150, 60, 110, 110]
+
+        # Build table
+        table = Table(data, colWidths=col_widths, repeatRows=1)
+        table_style_cmds = [
+            ('BACKGROUND', (0, 0), (-1, 0), teal),
+            ('TEXTCOLOR', (0, 0), (-1, 0), white),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, 0), 9),
+            ('ALIGN', (0, 0), (-1, 0), 'CENTER'),
+            ('BOTTOMPADDING', (0, 0), (-1, 0), 8),
+            ('TOPPADDING', (0, 0), (-1, 0), 8),
+            ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
+            ('FONTSIZE', (0, 1), (-1, -1), 8),
+            ('TOPPADDING', (0, 1), (-1, -1), 6),
+            ('BOTTOMPADDING', (0, 1), (-1, -1), 6),
+            ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#cbd5e1')),
+            ('ALIGN', (-2, 1), (-1, -1), 'RIGHT'),
+            # Summary row bold
+            ('FONTNAME', (0, -1), (-1, -1), 'Helvetica-Bold'),
+            ('BACKGROUND', (0, -1), (-1, -1), colors.HexColor('#f8fafc')),
+            ('LINEABOVE', (0, -1), (-1, -1), 1.5, dark_slate),
+        ]
+        # Alternating row shading
+        for i in range(1, len(data) - 1):
+            if i % 2 == 0:
+                table_style_cmds.append(('BACKGROUND', (0, i), (-1, i), light_bg))
+
+        table.setStyle(TableStyle(table_style_cmds))
+        elements.append(table)
+        elements.append(Spacer(1, 20))
+        elements.append(HRFlowable(width="100%", thickness=0.5, color=colors.HexColor('#e2e8f0'), spaceAfter=8))
+        elements.append(Paragraph(f"<i>Generated via AB+ Laboratory Platform — {lab.name}</i>", ParagraphStyle('Footer', parent=styles['Normal'], fontSize=7, textColor=colors.HexColor('#94a3b8'))))
+
+        # Build with page numbers
+        def add_page_number(canvas_obj, doc_obj):
+            page_num = canvas_obj.getPageNumber()
+            canvas_obj.saveState()
+            canvas_obj.setFont('Helvetica', 7)
+            canvas_obj.setFillColor(colors.HexColor('#94a3b8'))
+            canvas_obj.drawRightString(doc_obj.pagesize[0] - 20*mm, 10*mm, f"Page {page_num}")
+            canvas_obj.restoreState()
+
+        doc.build(elements, onFirstPage=add_page_number, onLaterPages=add_page_number)
+
+        buffer.seek(0)
+        filename = f"commission_report_{report_type}_{from_date_str}_{to_date_str}.pdf"
+        from django.http import HttpResponse
+        response = HttpResponse(buffer.getvalue(), content_type='application/pdf')
+        response['Content-Disposition'] = f'attachment; filename="{filename}"'
+        return response
+
+
+class CommissionReportExcelView(views.APIView):
+    """Generate and stream an Excel commission report."""
+    permission_classes = [IsAuthenticated]
+
+    def _resolve_lab(self, request):
+        lab = request.user.lab
+        if not lab and request.user.is_superuser:
+            lab_id = request.query_params.get('lab_id')
+            if lab_id:
+                from .models import Lab
+                lab = Lab.objects.filter(id=lab_id).first()
+        return lab
+
+    def get(self, request):
+        if request.user.role != 'LAB_ADMIN' and not request.user.is_superuser:
+            return Response({"detail": "Permission denied."}, status=status.HTTP_403_FORBIDDEN)
+
+        lab = self._resolve_lab(request)
+        if not lab:
+            return Response({"error": "No lab associated with user."}, status=status.HTTP_400_BAD_REQUEST)
+
+        report_type = request.query_params.get('type', 'consolidated')
+        from_date_str = request.query_params.get('from_date')
+        to_date_str = request.query_params.get('to_date')
+        doctor_id = request.query_params.get('doctor_id')
+        include_patients = request.query_params.get('include_patients', 'false').lower() == 'true'
+
+        if not from_date_str or not to_date_str:
+            return Response({"error": "from_date and to_date are required."}, status=status.HTTP_400_BAD_REQUEST)
+
+        from datetime import datetime as dt
+        try:
+            from_date = dt.strptime(from_date_str, '%Y-%m-%d').date()
+            to_date = dt.strptime(to_date_str, '%Y-%m-%d').date()
+        except ValueError:
+            return Response({"error": "Invalid date format."}, status=status.HTTP_400_BAD_REQUEST)
+
+        if from_date > to_date:
+            return Response({"error": "from_date cannot be greater than to_date."}, status=status.HTTP_400_BAD_REQUEST)
+
+        from django.db.models import Sum, Count
+        import io
+        from openpyxl import Workbook
+        from openpyxl.styles import Font, PatternFill, Alignment, Border, Side, numbers
+        from openpyxl.utils import get_column_letter
+
+        base_qs = DoctorCommissionEntry.objects.filter(
+            lab=lab, delete_flag='N',
+            entry_date__gte=from_date, entry_date__lte=to_date
+        )
+
+        wb = Workbook()
+        ws = wb.active
+
+        teal_fill = PatternFill(start_color='0d9488', end_color='0d9488', fill_type='solid')
+        header_font = Font(name='Calibri', bold=True, color='FFFFFF', size=11)
+        data_font = Font(name='Calibri', size=10)
+        bold_font = Font(name='Calibri', bold=True, size=10)
+        title_font = Font(name='Calibri', bold=True, size=14, color='1e293b')
+        sub_font = Font(name='Calibri', size=10, color='64748b')
+        currency_fmt = '₹#,##0.00'
+        thin_border = Border(
+            left=Side(style='thin', color='cbd5e1'),
+            right=Side(style='thin', color='cbd5e1'),
+            top=Side(style='thin', color='cbd5e1'),
+            bottom=Side(style='thin', color='cbd5e1'),
+        )
+        alt_fill = PatternFill(start_color='f1f5f9', end_color='f1f5f9', fill_type='solid')
+        summary_fill = PatternFill(start_color='f8fafc', end_color='f8fafc', fill_type='solid')
+
+        # Title rows
+        ws.merge_cells('A1:F1')
+        ws['A1'] = f"{lab.name} — Commission Report"
+        ws['A1'].font = title_font
+        now_str = dt.now().strftime('%d %b %Y, %I:%M %p')
+        report_label = "Consolidated" if report_type == 'consolidated' else "Doctor Wise"
+        ws.merge_cells('A2:F2')
+        ws['A2'] = f"Type: {report_label} | Period: {from_date_str} to {to_date_str} | Generated: {now_str}"
+        ws['A2'].font = sub_font
+
+        start_row = 4
+
+        if report_type == 'doctor_wise' and doctor_id:
+            base_qs = base_qs.filter(doctor_id=doctor_id)
+            doctor = ReferredDoctor.objects.filter(id=doctor_id, delete_flag='N').first()
+            if doctor:
+                ws.merge_cells(f'A3:F3')
+                ws['A3'] = f"Doctor: {doctor.doctor_name} | Hospital: {doctor.hospital_name}"
+                ws['A3'].font = sub_font
+                start_row = 5
+
+            ws.title = 'Doctor Commission'
+            if include_patients:
+                headers = ['Patient Name', 'Patient Code', 'Date', 'Test', 'Billing (₹)', 'Commission (₹)']
+                for col_idx, h in enumerate(headers, 1):
+                    cell = ws.cell(row=start_row, column=col_idx, value=h)
+                    cell.font = header_font
+                    cell.fill = teal_fill
+                    cell.alignment = Alignment(horizontal='center')
+                    cell.border = thin_border
+
+                entries = base_qs.select_related('patient', 'test')
+                patient_map = {}
+                for e in entries:
+                    pid = e.patient_id
+                    if pid not in patient_map:
+                        patient_map[pid] = {
+                            "name": e.patient.name,
+                            "code": e.patient.id,
+                            "date": e.entry_date,
+                            "tests": [],
+                            "billing": 0.0,
+                            "commission": 0.0,
+                        }
+                    patient_map[pid]["tests"].append(e.test.name)
+                    patient_map[pid]["billing"] += float(e.test_price)
+                    patient_map[pid]["commission"] += float(e.commission_amount)
+                    if e.entry_date < patient_map[pid]["date"]:
+                        patient_map[pid]["date"] = e.entry_date
+
+                records = list(patient_map.values())
+                records.sort(key=lambda x: (x["date"], x["name"]))
+
+                row = start_row + 1
+                total_billing = 0
+                total_commission = 0
+                for r in records:
+                    tb = r["billing"]
+                    tc = r["commission"]
+                    total_billing += tb
+                    total_commission += tc
+                    ws.cell(row=row, column=1, value=r["name"]).font = data_font
+                    ws.cell(row=row, column=2, value=r["code"]).font = data_font
+                    ws.cell(row=row, column=3, value=r["date"].strftime('%d/%m/%Y')).font = data_font
+                    ws.cell(row=row, column=4, value=", ".join(r["tests"])).font = data_font
+                    c5 = ws.cell(row=row, column=5, value=tb)
+                    c5.font = data_font
+                    c5.number_format = currency_fmt
+                    c6 = ws.cell(row=row, column=6, value=tc)
+                    c6.font = data_font
+                    c6.number_format = currency_fmt
+                    for c in range(1, 7):
+                        ws.cell(row=row, column=c).border = thin_border
+                        if (row - start_row) % 2 == 0:
+                            ws.cell(row=row, column=c).fill = alt_fill
+                    row += 1
+                # Summary row
+                ws.cell(row=row, column=4, value='TOTAL').font = bold_font
+                c5 = ws.cell(row=row, column=5, value=total_billing)
+                c5.font = bold_font
+                c5.number_format = currency_fmt
+                c6 = ws.cell(row=row, column=6, value=total_commission)
+                c6.font = bold_font
+                c6.number_format = currency_fmt
+                for c in range(1, 7):
+                    ws.cell(row=row, column=c).border = thin_border
+                    ws.cell(row=row, column=c).fill = summary_fill
+            else:
+                headers = ['Doctor Name', 'Hospital', 'Patients', 'Billing (₹)', 'Commission (₹)']
+                for col_idx, h in enumerate(headers, 1):
+                    cell = ws.cell(row=start_row, column=col_idx, value=h)
+                    cell.font = header_font
+                    cell.fill = teal_fill
+                    cell.alignment = Alignment(horizontal='center')
+                    cell.border = thin_border
+
+                agg = base_qs.aggregate(
+                    patient_count=Count('patient', distinct=True),
+                    total_billing=Sum('test_price'),
+                    total_commission=Sum('commission_amount'),
+                )
+                row = start_row + 1
+                tb = float(agg['total_billing'] or 0)
+                tc = float(agg['total_commission'] or 0)
+                ws.cell(row=row, column=1, value=doctor.doctor_name if doctor else 'N/A').font = data_font
+                ws.cell(row=row, column=2, value=doctor.hospital_name if doctor else 'N/A').font = data_font
+                ws.cell(row=row, column=3, value=agg['patient_count'] or 0).font = data_font
+                c4 = ws.cell(row=row, column=4, value=tb)
+                c4.font = data_font
+                c4.number_format = currency_fmt
+                c5 = ws.cell(row=row, column=5, value=tc)
+                c5.font = data_font
+                c5.number_format = currency_fmt
+                for c in range(1, 6):
+                    ws.cell(row=row, column=c).border = thin_border
+                row += 1
+                ws.cell(row=row, column=3, value='TOTAL').font = bold_font
+                c4 = ws.cell(row=row, column=4, value=tb)
+                c4.font = bold_font
+                c4.number_format = currency_fmt
+                c5 = ws.cell(row=row, column=5, value=tc)
+                c5.font = bold_font
+                c5.number_format = currency_fmt
+                for c in range(1, 6):
+                    ws.cell(row=row, column=c).border = thin_border
+                    ws.cell(row=row, column=c).fill = summary_fill
+        else:
+            # Consolidated
+            ws.title = 'Consolidated Commission'
+            doctor_groups = base_qs.values(
+                'doctor', 'doctor__doctor_name', 'doctor__hospital_name'
+            ).annotate(
+                patient_count=Count('patient', distinct=True),
+                referral_billing=Sum('test_price'),
+                total_commission=Sum('commission_amount'),
+            ).order_by('-total_commission')
+
+            headers = ['Doctor Name', 'Hospital', 'Patients', 'Billing (₹)', 'Commission (₹)']
+            for col_idx, h in enumerate(headers, 1):
+                cell = ws.cell(row=start_row, column=col_idx, value=h)
+                cell.font = header_font
+                cell.fill = teal_fill
+                cell.alignment = Alignment(horizontal='center')
+                cell.border = thin_border
+
+            row = start_row + 1
+            total_billing = 0
+            total_commission = 0
+            for dg in doctor_groups:
+                rb = float(dg['referral_billing'] or 0)
+                tc = float(dg['total_commission'] or 0)
+                total_billing += rb
+                total_commission += tc
+                ws.cell(row=row, column=1, value=dg['doctor__doctor_name']).font = data_font
+                ws.cell(row=row, column=2, value=dg['doctor__hospital_name']).font = data_font
+                ws.cell(row=row, column=3, value=dg['patient_count'] or 0).font = data_font
+                c4 = ws.cell(row=row, column=4, value=rb)
+                c4.font = data_font
+                c4.number_format = currency_fmt
+                c5 = ws.cell(row=row, column=5, value=tc)
+                c5.font = data_font
+                c5.number_format = currency_fmt
+                for c in range(1, 6):
+                    ws.cell(row=row, column=c).border = thin_border
+                    if (row - start_row) % 2 == 0:
+                        ws.cell(row=row, column=c).fill = alt_fill
+                row += 1
+            # Summary row
+            ws.cell(row=row, column=3, value='TOTAL').font = bold_font
+            c4 = ws.cell(row=row, column=4, value=total_billing)
+            c4.font = bold_font
+            c4.number_format = currency_fmt
+            c5 = ws.cell(row=row, column=5, value=total_commission)
+            c5.font = bold_font
+            c5.number_format = currency_fmt
+            for c in range(1, 6):
+                ws.cell(row=row, column=c).border = thin_border
+                ws.cell(row=row, column=c).fill = summary_fill
+
+        # Auto-width columns
+        for col in range(1, ws.max_column + 1):
+            max_length = 0
+            column_letter = get_column_letter(col)
+            for cell in ws[column_letter]:
+                try:
+                    if cell.value:
+                        max_length = max(max_length, len(str(cell.value)))
+                except Exception:
+                    pass
+            ws.column_dimensions[column_letter].width = min(max_length + 4, 40)
+
+        buffer = io.BytesIO()
+        wb.save(buffer)
+        buffer.seek(0)
+
+        filename = f"commission_report_{report_type}_{from_date_str}_{to_date_str}.xlsx"
+        from django.http import HttpResponse
+        response = HttpResponse(
+            buffer.getvalue(),
+            content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        )
+        response['Content-Disposition'] = f'attachment; filename="{filename}"'
+        return response
+
+
+# ─── Informative Reports Center Views ───────────────────────────────────
+
+from .reports_registry import REPORTS_REGISTRY, run_informative_report
+
+class InformativeReportsListView(views.APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        if request.user.role != 'LAB_ADMIN' and not request.user.is_superuser:
+            return Response({"detail": "Permission denied. Only Lab Admins can view informative reports."}, status=status.HTTP_403_FORBIDDEN)
+        
+        # Return registry as a list
+        return Response(list(REPORTS_REGISTRY.values()))
+
+
+class InformativeReportPreviewView(views.APIView):
+    permission_classes = [IsAuthenticated]
+
+    def _resolve_lab(self, request):
+        lab = request.user.lab
+        if not lab and request.user.is_superuser:
+            lab_id = request.query_params.get('lab_id')
+            if lab_id:
+                from .models import Lab
+                lab = Lab.objects.filter(id=lab_id).first()
+        return lab
+
+    def get(self, request):
+        if request.user.role != 'LAB_ADMIN' and not request.user.is_superuser:
+            return Response({"detail": "Permission denied."}, status=status.HTTP_403_FORBIDDEN)
+
+        lab = self._resolve_lab(request)
+        if not lab:
+            return Response({"error": "No lab associated with user."}, status=status.HTTP_400_BAD_REQUEST)
+
+        report_id = request.query_params.get('report_id')
+        if not report_id:
+            return Response({"error": "report_id is required."}, status=status.HTTP_400_BAD_REQUEST)
+
+        if report_id not in REPORTS_REGISTRY:
+            return Response({"error": "Report not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        try:
+            records, summary = run_informative_report(report_id, lab, request.query_params)
+            return Response({
+                "report_id": report_id,
+                "report_name": REPORTS_REGISTRY[report_id]['name'],
+                "columns": REPORTS_REGISTRY[report_id]['columns'],
+                "records": records,
+                "summary": summary,
+                "lab_name": lab.name
+            })
+        except Exception as e:
+            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+
+class InformativeReportExportView(views.APIView):
+    permission_classes = [IsAuthenticated]
+
+    def _resolve_lab(self, request):
+        lab = request.user.lab
+        if not lab and request.user.is_superuser:
+            lab_id = request.query_params.get('lab_id')
+            if lab_id:
+                from .models import Lab
+                lab = Lab.objects.filter(id=lab_id).first()
+        return lab
+
+    def get(self, request):
+        if request.user.role != 'LAB_ADMIN' and not request.user.is_superuser:
+            return Response({"detail": "Permission denied."}, status=status.HTTP_403_FORBIDDEN)
+
+        lab = self._resolve_lab(request)
+        if not lab:
+            return Response({"error": "No lab associated with user."}, status=status.HTTP_400_BAD_REQUEST)
+
+        report_id = request.query_params.get('report_id')
+        export_format = request.query_params.get('format', 'pdf').lower()
+
+        if not report_id:
+            return Response({"error": "report_id is required."}, status=status.HTTP_400_BAD_REQUEST)
+
+        if report_id not in REPORTS_REGISTRY:
+            return Response({"error": "Report not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        try:
+            records, summary = run_informative_report(report_id, lab, request.query_params)
+        except Exception as e:
+            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+        report_meta = REPORTS_REGISTRY[report_id]
+        report_name = report_meta['name']
+
+        if export_format == 'pdf':
+            # PDF Export using ReportLab
+            import io
+            from reportlab.lib import colors
+            from reportlab.lib.pagesizes import A4, landscape
+            from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+            from reportlab.lib.units import mm
+            from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, HRFlowable
+            from django.http import HttpResponse
+
+            buffer = io.BytesIO()
+            # Landscape for reports with many columns
+            is_landscape = report_id in ['consolidated_patient', 'collection_boy_performance']
+            page_size = landscape(A4) if is_landscape else A4
+            doc = SimpleDocTemplate(
+                buffer, pagesize=page_size,
+                leftMargin=15*mm, rightMargin=15*mm,
+                topMargin=20*mm, bottomMargin=20*mm
+            )
+
+            styles = getSampleStyleSheet()
+            teal = colors.HexColor('#0d9488')
+            dark_slate = colors.HexColor('#1e293b')
+            light_bg = colors.HexColor('#f8fafc')
+            white = colors.white
+
+            title_style = ParagraphStyle('ReportTitle', parent=styles['Heading1'], fontSize=16, textColor=dark_slate, spaceAfter=4)
+            subtitle_style = ParagraphStyle('ReportSubtitle', parent=styles['Normal'], fontSize=9, textColor=colors.HexColor('#64748b'), spaceAfter=12)
+            meta_style = ParagraphStyle('ReportMeta', parent=styles['Normal'], fontSize=8, textColor=colors.HexColor('#475569'))
+            cell_style = ParagraphStyle('ReportCell', parent=styles['Normal'], fontSize=7.5, leading=9, textColor=dark_slate)
+            header_cell_style = ParagraphStyle('ReportHeaderCell', parent=styles['Normal'], fontSize=7.5, leading=9, textColor=white, fontName='Helvetica-Bold')
+
+            elements = []
+
+            # Lab Name and Header
+            elements.append(Paragraph(f"{lab.name}", title_style))
+            elements.append(Paragraph(f"AB+ Informative Reports — {report_name}", subtitle_style))
+            elements.append(HRFlowable(width="100%", thickness=1.5, color=teal, spaceAfter=10))
+
+            # Metadata
+            from_date_str = request.query_params.get('from_date', '-')
+            to_date_str = request.query_params.get('to_date', '-')
+            now_str = datetime.datetime.now().strftime('%d %b %Y, %I:%M %p')
+            
+            meta_text = f"<b>Report:</b> {report_name} &nbsp;&nbsp;|&nbsp;&nbsp; <b>Generated:</b> {now_str}"
+            if from_date_str != '-' and to_date_str != '-':
+                meta_text += f" &nbsp;&nbsp;|&nbsp;&nbsp; <b>Period:</b> {from_date_str} to {to_date_str}"
+            elif request.query_params.get('single_date'):
+                meta_text += f" &nbsp;&nbsp;|&nbsp;&nbsp; <b>Date:</b> {request.query_params.get('single_date')}"
+            elif request.query_params.get('month') and request.query_params.get('year'):
+                meta_text += f" &nbsp;&nbsp;|&nbsp;&nbsp; <b>Month/Year:</b> {request.query_params.get('month')}/{request.query_params.get('year')}"
+            elif request.query_params.get('aging'):
+                meta_text += f" &nbsp;&nbsp;|&nbsp;&nbsp; <b>Aging Bucket:</b> {request.query_params.get('aging')}"
+                
+            elements.append(Paragraph(meta_text, meta_style))
+            elements.append(Spacer(1, 10))
+
+            # Table Data Construction
+            headers = [col['label'] for col in report_meta['columns']]
+            data = [[Paragraph(h, header_cell_style) for h in headers]]
+
+            for r in records:
+                row = []
+                for col in report_meta['columns']:
+                    val = r.get(col['key'], '-')
+                    if val is None:
+                        val = '-'
+                    # Formatting values
+                    if col.get('format') == 'currency' and isinstance(val, (int, float)):
+                        val_str = f"₹{val:,.2f}"
+                    elif isinstance(val, bool):
+                        val_str = "Yes" if val else "No"
+                    else:
+                        val_str = str(val)
+                    row.append(Paragraph(val_str, cell_style))
+                data.append(row)
+
+            # Column Widths Setup
+            # Determine proportional column widths to fit margins (landscape A4 available: ~760pt, portrait: ~530pt)
+            available_width = 760 if is_landscape else 530
+            col_count = len(headers)
+            col_widths = [available_width / col_count] * col_count
+
+            # Set custom widths for Consolidated Patient Report to prevent cramped columns
+            if report_id == 'consolidated_patient':
+                col_widths = [60, 80, 25, 35, 55, 60, 110, 50, 50, 50, 60, 60, 55] # sum is 700pt
+            elif report_id == 'collection_boy_performance':
+                col_widths = [110, 80, 80, 80, 80, 80, 80] # sum is 590pt
+            elif report_id == 'patients_by_doctor':
+                col_widths = [80, 55, 75, 25, 35, 55, 55, 100, 50] # sum is 530pt
+            elif report_id == 'pending_payment':
+                col_widths = [90, 60, 75, 55, 55, 55, 65, 75] # sum is 530pt
+
+            table = Table(data, colWidths=col_widths, repeatRows=1)
+            table_style_cmds = [
+                ('BACKGROUND', (0, 0), (-1, 0), teal),
+                ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+                ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+                ('TOPPADDING', (0, 0), (-1, -1), 6),
+                ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
+                ('LEFTPADDING', (0, 0), (-1, -1), 4),
+                ('RIGHTPADDING', (0, 0), (-1, -1), 4),
+                ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#cbd5e1')),
+            ]
+            
+            # Alternating row backgrounds
+            for i in range(1, len(data)):
+                if i % 2 == 0:
+                    table_style_cmds.append(('BACKGROUND', (0, i), (-1, i), light_bg))
+
+            table.setStyle(TableStyle(table_style_cmds))
+            elements.append(table)
+            elements.append(Spacer(1, 15))
+
+            # Summary metrics at bottom
+            summary_parts = []
+            for k, v in summary.items():
+                k_label = k.replace('total_', '').replace('_', ' ').title()
+                if 'billing' in k or 'revenue' in k or 'paid' in k or 'pending' in k or 'profit' in k or 'concession' in k or 'collected' in k or 'commission' in k or 'outstanding' in k:
+                    v_str = f"₹{v:,.2f}"
+                else:
+                    v_str = str(v)
+                summary_parts.append(f"<b>{k_label}:</b> {v_str}")
+            
+            if summary_parts:
+                elements.append(Paragraph(" &nbsp;&nbsp;|&nbsp;&nbsp; ".join(summary_parts), ParagraphStyle('SummaryText', parent=styles['Normal'], fontSize=9, textColor=dark_slate)))
+
+            elements.append(Spacer(1, 15))
+            elements.append(HRFlowable(width="100%", thickness=0.5, color=colors.HexColor('#e2e8f0'), spaceAfter=8))
+            elements.append(Paragraph(f"<i>Generated via AB+ Laboratory Platform — {lab.name}</i>", ParagraphStyle('Footer', parent=styles['Normal'], fontSize=7, textColor=colors.HexColor('#94a3b8'))))
+
+            def add_page_number(canvas_obj, doc_obj):
+                page_num = canvas_obj.getPageNumber()
+                canvas_obj.saveState()
+                canvas_obj.setFont('Helvetica', 7)
+                canvas_obj.setFillColor(colors.HexColor('#94a3b8'))
+                w = doc_obj.pagesize[0]
+                canvas_obj.drawRightString(w - 15*mm, 10*mm, f"Page {page_num}")
+                canvas_obj.restoreState()
+
+            doc.build(elements, onFirstPage=add_page_number, onLaterPages=add_page_number)
+            
+            response = HttpResponse(buffer.getvalue(), content_type='application/pdf')
+            response['Content-Disposition'] = f'attachment; filename="informative_report_{report_id}.pdf"'
+            return response
+
+        elif export_format == 'excel':
+            # Excel Export using OpenPyXL
+            import openpyxl
+            from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+            from openpyxl.utils import get_column_letter
+            from django.http import HttpResponse
+
+            wb = openpyxl.Workbook()
+            ws = wb.active
+            ws.title = "Report"
+            ws.views.sheetView[0].showGridLines = True
+
+            # Styles
+            title_font = Font(name='Calibri', size=16, bold=True, color='1F2937')
+            sub_font = Font(name='Calibri', size=11, italic=True, color='4B5563')
+            header_font = Font(name='Calibri', size=11, bold=True, color='FFFFFF')
+            data_font = Font(name='Calibri', size=11, color='1F2937')
+            bold_font = Font(name='Calibri', size=11, bold=True, color='1F2937')
+
+            teal_fill = PatternFill(start_color='0D9488', end_color='0D9488', fill_type='solid')
+            alt_fill = PatternFill(start_color='F8FAFC', end_color='F8FAFC', fill_type='solid')
+            summary_fill = PatternFill(start_color='F1F5F9', end_color='F1F5F9', fill_type='solid')
+
+            thin_border = Border(
+                left=Side(style='thin', color='CBD5E1'),
+                right=Side(style='thin', color='CBD5E1'),
+                top=Side(style='thin', color='CBD5E1'),
+                bottom=Side(style='thin', color='CBD5E1')
+            )
+            currency_fmt = '₹#,##0.00'
+
+            # 1. Title Block
+            ws['A1'] = lab.name
+            ws['A1'].font = title_font
+            ws['A2'] = f"AB+ Informative Reports — {report_name}"
+            ws['A2'].font = sub_font
+            
+            from_date_str = request.query_params.get('from_date', '-')
+            to_date_str = request.query_params.get('to_date', '-')
+            now_str = datetime.datetime.now().strftime('%d %b %Y, %I:%M %p')
+            meta_str = f"Generated: {now_str}"
+            if from_date_str != '-' and to_date_str != '-':
+                meta_str += f" | Period: {from_date_str} to {to_date_str}"
+            elif request.query_params.get('single_date'):
+                meta_str += f" | Date: {request.query_params.get('single_date')}"
+            elif request.query_params.get('month') and request.query_params.get('year'):
+                meta_str += f" | Month/Year: {request.query_params.get('month')}/{request.query_params.get('year')}"
+            ws['A3'] = meta_str
+            ws['A3'].font = sub_font
+
+            start_row = 5
+
+            # 2. Table Headers
+            for col_idx, col in enumerate(report_meta['columns'], 1):
+                cell = ws.cell(row=start_row, column=col_idx, value=col['label'])
+                cell.font = header_font
+                cell.fill = teal_fill
+                cell.alignment = Alignment(horizontal='center', vertical='center', wrap_text=True)
+                cell.border = thin_border
+
+            # 3. Table Rows
+            row_idx = start_row + 1
+            for r in records:
+                for col_idx, col in enumerate(report_meta['columns'], 1):
+                    val = r.get(col['key'], '')
+                    cell = ws.cell(row=row_idx, column=col_idx)
+                    
+                    if col.get('format') == 'currency' and isinstance(val, (int, float)):
+                        cell.value = val
+                        cell.number_format = currency_fmt
+                        cell.alignment = Alignment(horizontal='right')
+                    elif isinstance(val, (int, float)) and not isinstance(val, bool):
+                        cell.value = val
+                        cell.alignment = Alignment(horizontal='right')
+                    else:
+                        cell.value = str(val) if val is not None else ''
+                        cell.alignment = Alignment(horizontal='left')
+
+                    cell.font = data_font
+                    cell.border = thin_border
+                    if (row_idx - start_row) % 2 == 0:
+                        cell.fill = alt_fill
+
+                row_idx += 1
+
+            # 4. Summary Totals Row
+            for col_idx, col in enumerate(report_meta['columns'], 1):
+                cell = ws.cell(row=row_idx, column=col_idx)
+                cell.border = thin_border
+                cell.fill = summary_fill
+                cell.font = bold_font
+
+            ws.cell(row=row_idx, column=1, value="TOTAL").font = bold_font
+
+            # Place aggregated values in corresponding columns
+            for k, v in summary.items():
+                cleaned_key = k.replace('total_', '')
+                for col_idx, col in enumerate(report_meta['columns'], 1):
+                    col_key = col['key']
+                    is_match = (cleaned_key == col_key) or \
+                               (cleaned_key == 'billing' and col_key in ['billing_amount', 'bill_amount', 'referral_billing']) or \
+                               (cleaned_key == 'concessions' and col_key == 'concessions_given') or \
+                               (cleaned_key == 'collected' and col_key == 'cash_collected') or \
+                               (cleaned_key == 'outstanding' and col_key == 'outstanding_cash') or \
+                               (cleaned_key == 'submitted' and col_key == 'submitted_to_cashier') or \
+                               (cleaned_key == 'paid' and col_key == 'paid_amount') or \
+                               (cleaned_key == 'pending' and col_key in ['pending_amount', 'pending_receivables'])
+                    if is_match:
+                        cell = ws.cell(row=row_idx, column=col_idx, value=v)
+                        if col.get('format') == 'currency':
+                            cell.number_format = currency_fmt
+                        break
+
+            # 5. Auto-fit column widths
+            for col in range(1, ws.max_column + 1):
+                max_length = 0
+                column_letter = get_column_letter(col)
+                for cell in ws[column_letter]:
+                    try:
+                        if cell.value:
+                            max_length = max(max_length, len(str(cell.value)))
+                    except Exception:
+                        pass
+                ws.column_dimensions[column_letter].width = min(max_length + 4, 50)
+
+            buffer = io.BytesIO()
+            wb.save(buffer)
+            buffer.seek(0)
+
+            filename = f"informative_report_{report_id}.xlsx"
+            response = HttpResponse(
+                buffer.getvalue(),
+                content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+            )
+            response['Content-Disposition'] = f'attachment; filename="{filename}"'
+            return response
+
+        return Response({"error": "Invalid format specified."}, status=status.HTTP_400_BAD_REQUEST)
 
 

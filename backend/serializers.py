@@ -4,9 +4,68 @@
 from rest_framework import serializers
 from django.db import transaction
 from django.contrib.auth import get_user_model
-from .models import Lab, ActivityLog, MasterTest, MasterTestParameter, LabTest, LabTestParameter, PatientEntry, Expense, LabSettings, ReferredDoctor, CashierReceipt, DailyCloseout, PaymentTransaction, CashierAdminSettlement
+from .models import Lab, ActivityLog, MasterTest, MasterTestParameter, LabTest, LabTestParameter, PatientEntry, Expense, LabSettings, ReferredDoctor, CashierReceipt, DailyCloseout, PaymentTransaction, CashierAdminSettlement, DoctorCommissionEntry
 
 User = get_user_model()
+
+
+def recalculate_doctor_commission_entries(patient):
+    from django.utils import timezone
+    from .models import DoctorCommissionEntry
+    
+    # If the patient has no referred doctor or is soft-deleted,
+    # we should soft-delete any existing commission entries.
+    if not patient.referred_doctor or patient.delete_flag == 'Y':
+        patient.commission_entries.all().update(
+            delete_flag='Y',
+            deleted_at=timezone.now()
+        )
+        return
+
+    # Enforce timezone-aware now
+    now = timezone.now()
+    active_tests = list(patient.tests.all())
+    active_test_ids = [t.id for t in active_tests]
+
+    # Get all existing non-deleted commission entries for this patient
+    existing_entries = {e.test_id: e for e in patient.commission_entries.filter(delete_flag='N')}
+
+    # Soft-delete entries for tests that are no longer part of this patient registration
+    for test_id, entry in existing_entries.items():
+        if test_id not in active_test_ids:
+            entry.delete_flag = 'Y'
+            entry.deleted_at = now
+            entry.save()
+
+    # Create entries for new tests or update doctor for existing ones
+    for test in active_tests:
+        # Get current test commission percentage
+        commission_percentage = getattr(test, 'commission_percentage', 50.00)
+        if commission_percentage is None:
+            commission_percentage = 50.00
+            
+        test_price = test.price
+        commission_amount = (test_price * commission_percentage) / 100
+
+        if test.id in existing_entries:
+            entry = existing_entries[test.id]
+            # If referred doctor has changed, update it on the existing entry
+            if entry.doctor != patient.referred_doctor:
+                entry.doctor = patient.referred_doctor
+                entry.save()
+        else:
+            # Create a brand new snapshot entry
+            DoctorCommissionEntry.objects.create(
+                lab=patient.lab,
+                patient=patient,
+                doctor=patient.referred_doctor,
+                test=test,
+                test_price=test_price,
+                commission_percentage=commission_percentage,
+                commission_amount=commission_amount,
+                entry_date=patient.created_at
+            )
+
 
 class LabSerializer(serializers.ModelSerializer):
     """
@@ -272,7 +331,7 @@ class MasterTestSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = MasterTest
-        fields = ['id', 'name', 'category', 'code', 'tube_type', 'tube_color', 'default_price', 'is_active', 'created_at', 'parameters']
+        fields = ['id', 'name', 'category', 'code', 'tube_type', 'tube_color', 'default_price', 'is_active', 'commission_percentage', 'created_at', 'parameters']
 
 
 class LabTestParameterSerializer(serializers.ModelSerializer):
@@ -291,7 +350,12 @@ class LabTestSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = LabTest
-        fields = ['id', 'name', 'category', 'code', 'price', 'tube_type', 'tube_color', 'is_enabled', 'is_custom', 'parameters', 'lab_id', 'master_test_id']
+        fields = ['id', 'name', 'category', 'code', 'price', 'tube_type', 'tube_color', 'is_enabled', 'is_custom', 'commission_percentage', 'parameters', 'lab_id', 'master_test_id']
+
+    def validate_commission_percentage(self, value):
+        if value < 0 or value > 100:
+            raise serializers.ValidationError("Commission percentage must be between 0 and 100.")
+        return value
 
     def create(self, validated_data):
         parameters_data = validated_data.pop('parameters', [])
@@ -318,6 +382,7 @@ class LabTestSerializer(serializers.ModelSerializer):
         instance.tube_color = validated_data.get('tube_color', instance.tube_color)
         instance.is_enabled = validated_data.get('is_enabled', instance.is_enabled)
         instance.is_custom = validated_data.get('is_custom', instance.is_custom)
+        instance.commission_percentage = validated_data.get('commission_percentage', instance.commission_percentage)
         instance.save()
 
         if parameters_data is not None:
@@ -351,6 +416,7 @@ class LabTestSerializer(serializers.ModelSerializer):
             instance.parameters.exclude(id__in=keep_ids).delete()
 
         return instance
+
 
 
 class ReferredDoctorSerializer(serializers.ModelSerializer):
@@ -515,6 +581,7 @@ class PatientEntrySerializer(serializers.ModelSerializer):
                 notes='Initial payment during registration'
             )
 
+        recalculate_doctor_commission_entries(patient)
         return patient
 
     def update(self, instance, validated_data):
@@ -598,6 +665,7 @@ class PatientEntrySerializer(serializers.ModelSerializer):
                 notes='Adjusted via patient update'
             )
 
+        recalculate_doctor_commission_entries(instance)
         return instance
 
 

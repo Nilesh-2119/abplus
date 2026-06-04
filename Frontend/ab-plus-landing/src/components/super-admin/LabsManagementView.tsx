@@ -21,6 +21,7 @@ import {
   Calendar,
   X,
   CheckCircle,
+  Trash2,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -43,6 +44,10 @@ export default function LabsManagementView() {
   const [viewDetailOpen, setViewDetailOpen] = useState(false);
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [suspendConfirmOpen, setSuspendConfirmOpen] = useState(false);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [isEditingCode, setIsEditingCode] = useState(false);
+  const [newCodeValue, setNewCodeValue] = useState("");
+  const [codeError, setCodeError] = useState("");
 
   // Edit form state
   const [editName, setEditName] = useState("");
@@ -78,6 +83,44 @@ export default function LabsManagementView() {
 
   // Handle pagination pages bounds
   const totalPages = Math.ceil(totalCount / limit);
+
+  // Handlers for view detail & code editing
+  const openDetailModal = (lab: Lab) => {
+    setSelectedLab(lab);
+    setNewCodeValue(lab.lab_code || "");
+    setIsEditingCode(false);
+    setCodeError("");
+    setViewDetailOpen(true);
+  };
+
+  const handleSaveCode = async () => {
+    if (!selectedLab) return;
+    const cleanCode = newCodeValue.trim().toUpperCase();
+    if (!cleanCode) {
+      setCodeError("Staff code cannot be empty.");
+      return;
+    }
+    if (!/^[A-Z0-9]+$/.test(cleanCode)) {
+      setCodeError("Staff code must be alphanumeric (A-Z, 0-9) only.");
+      return;
+    }
+    
+    setActionLoading(true);
+    setCodeError("");
+    try {
+      const updatedLab = await apiService.updateLab(selectedLab.id, {
+        lab_code: cleanCode,
+      });
+      setSelectedLab(updatedLab);
+      setIsEditingCode(false);
+      fetchLabs();
+    } catch (err: any) {
+      console.error(err);
+      setCodeError("Failed to update code. It may already be in use.");
+    } finally {
+      setActionLoading(false);
+    }
+  };
 
   // Handlers for edit
   const openEditModal = (lab: Lab) => {
@@ -119,6 +162,21 @@ export default function LabsManagementView() {
       const targetStatus = selectedLab.status === "active" ? "suspended" : "active";
       await apiService.patchLabStatus(selectedLab.id, targetStatus);
       setSuspendConfirmOpen(false);
+      fetchLabs();
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  // Soft-delete lab
+  const handleDelete = async () => {
+    if (!selectedLab) return;
+    setActionLoading(true);
+    try {
+      await apiService.deleteLab(selectedLab.id);
+      setDeleteConfirmOpen(false);
       fetchLabs();
     } catch (err) {
       console.error(err);
@@ -265,10 +323,7 @@ export default function LabsManagementView() {
                     <td className="py-3.5 px-5 text-right">
                       <div className="flex items-center justify-end gap-1.5">
                         <button
-                          onClick={() => {
-                            setSelectedLab(lab);
-                            setViewDetailOpen(true);
-                          }}
+                          onClick={() => openDetailModal(lab)}
                           className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-sky-500 transition-colors"
                           title="View Info"
                         >
@@ -298,6 +353,16 @@ export default function LabsManagementView() {
                           ) : (
                             <Unlock size={15} />
                           )}
+                        </button>
+                        <button
+                          onClick={() => {
+                            setSelectedLab(lab);
+                            setDeleteConfirmOpen(true);
+                          }}
+                          className="rounded-lg p-1.5 text-slate-400 hover:bg-red-50 hover:text-red-600 transition-colors"
+                          title="Delete Lab"
+                        >
+                          <Trash2 size={15} />
                         </button>
                       </div>
                     </td>
@@ -417,6 +482,76 @@ export default function LabsManagementView() {
                   <div className="flex items-center gap-2.5">
                     <Mail size={15} className="text-slate-400 shrink-0" />
                     <span className="text-sky-600 underline font-normal">{selectedLab.admin_email}</span>
+                  </div>
+                </div>
+
+                <div className="border-t border-slate-100 pt-3 space-y-2">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+                    Staff Login Credentials
+                  </span>
+                  <div className="flex items-center justify-between gap-2.5 bg-slate-50/50 rounded-xl p-2.5 border border-slate-100">
+                    <div className="flex flex-col gap-0.5 w-full">
+                      <span className="text-[9px] text-slate-400 font-bold uppercase">Staff Code</span>
+                      {isEditingCode ? (
+                        <div className="flex flex-col gap-1.5 mt-1 w-full">
+                          <div className="flex items-center gap-1.5 w-full">
+                            <input
+                              type="text"
+                              value={newCodeValue}
+                              onChange={(e) => {
+                                setNewCodeValue(e.target.value);
+                                setCodeError("");
+                              }}
+                              className="flex-1 min-w-0 rounded-lg border border-slate-200 bg-white py-1.5 px-3 text-xs font-semibold text-slate-700 outline-none focus:border-sky-500 uppercase"
+                              placeholder="CODE"
+                            />
+                            <button
+                              type="button"
+                              onClick={handleSaveCode}
+                              disabled={actionLoading}
+                              className="flex items-center justify-center rounded-lg bg-emerald-500 px-3 py-1.5 text-[10px] font-semibold text-white hover:bg-emerald-600 active:scale-95 transition-all shrink-0 cursor-pointer"
+                            >
+                              {actionLoading && <RotateCw className="animate-spin h-3 w-3 mr-1" />}
+                              Save
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setIsEditingCode(false);
+                                setNewCodeValue(selectedLab.lab_code || "");
+                                setCodeError("");
+                              }}
+                              className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-[10px] font-semibold text-slate-500 hover:border-slate-300 active:scale-95 transition-all shrink-0 cursor-pointer"
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                          {codeError && (
+                            <span className="text-[9px] font-medium text-red-500 leading-tight">
+                              {codeError}
+                            </span>
+                          )}
+                        </div>
+                      ) : (
+                        <span className="font-mono text-xs font-extrabold text-slate-800 tracking-wider">
+                          {selectedLab.lab_code || "NOT SET"}
+                        </span>
+                      )}
+                    </div>
+                    {!isEditingCode && (
+                      <button
+                        onClick={() => {
+                          setNewCodeValue(selectedLab.lab_code || "");
+                          setIsEditingCode(true);
+                          setCodeError("");
+                        }}
+                        className="flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-[10px] font-bold text-slate-500 hover:border-slate-300 hover:text-slate-700 transition-colors cursor-pointer shrink-0"
+                        title="Edit Staff Code"
+                      >
+                        <Edit2 size={11} />
+                        <span>Edit</span>
+                      </button>
+                    )}
                   </div>
                 </div>
               </div>
@@ -616,6 +751,64 @@ export default function LabsManagementView() {
                   <span>
                     Confirm {selectedLab.status === "active" ? "Suspension" : "Activation"}
                   </span>
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Delete Confirmation Modal */}
+      <AnimatePresence>
+        {deleteConfirmOpen && selectedLab && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setDeleteConfirmOpen(false)}
+              className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm"
+            />
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0, y: 20 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.95, opacity: 0, y: 20 }}
+              className="relative w-full max-w-sm overflow-hidden rounded-2xl border border-slate-200/80 bg-white p-5 shadow-xl backdrop-blur-md"
+            >
+              <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-red-50 text-red-500">
+                  <Trash2 size={20} />
+                </div>
+                <div>
+                  <h3 className="font-syne text-sm font-bold text-slate-800">
+                    Confirm Deletion
+                  </h3>
+                  <p className="text-[11px] font-medium text-red-500">
+                    This action is permanent and irreversible!
+                  </p>
+                </div>
+              </div>
+
+              <div className="mt-3.5 text-xs text-slate-500 leading-relaxed font-medium">
+                Are you sure you want to delete the lab{" "}
+                <span className="font-bold text-slate-700">"{selectedLab.name}"</span>?
+                This will soft-delete the lab and deactivate all connected tenant records (users, patients, expenses, tests, and doctors). They will no longer be visible anywhere in the project.
+              </div>
+
+              <div className="mt-5 flex items-center justify-end gap-2.5">
+                <button
+                  onClick={() => setDeleteConfirmOpen(false)}
+                  className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-500 hover:border-slate-300"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleDelete}
+                  disabled={actionLoading}
+                  className="flex items-center gap-1.5 rounded-xl bg-red-500 px-4 py-2 text-xs font-semibold text-white hover:bg-red-600 focus:scale-[0.98]"
+                >
+                  {actionLoading && <RotateCw className="animate-spin h-3.5 w-3.5" />}
+                  <span>Confirm Delete</span>
                 </button>
               </div>
             </motion.div>

@@ -357,7 +357,7 @@ class CashFlowArchitectureTests(TestCase):
         self.assertEqual(data['total_patients'], 1)
         self.assertEqual(data['todays_collected'], 300.0)
         self.assertEqual(data['net_cash_in_hand'], 300.0)
-        self.assertEqual(data['cash_not_submitted'], 300.0)
+        self.assertEqual(data['cash_not_submitted'], 0.0)
         self.assertEqual(data['total_pending_receivables'], 200.0)
 
         # 2. Test Dashboard Stats Endpoint as Cashier
@@ -442,7 +442,7 @@ class CashFlowArchitectureTests(TestCase):
         data = response.json()
         self.assertEqual(data['todays_collected'], 1500.0)
         self.assertEqual(data['net_cash_in_hand'], 1400.0)
-        self.assertEqual(data['cash_not_submitted'], 1500.0)
+        self.assertEqual(data['cash_not_submitted'], 0.0)
 
         # 3. Cashier settles the boy via settle API
         client.force_authenticate(user=self.cashier)
@@ -531,4 +531,83 @@ class CashFlowArchitectureTests(TestCase):
         self.assertEqual(txn.deleted_by, self.cashier)
         self.assertEqual(pay.deleted_by, self.cashier)
         self.assertEqual(conc.deleted_by, self.cashier)
+
+    def test_collection_boy_carry_forward_and_backdated_snapshot_architecture(self):
+        """
+        Verify AB+ CASH FLOW carry-forward logic:
+        1. 03-Jun: Today's Collection = 1550, Today's Expenses = 100, Submitted = 0
+           -> Net Cash In Hand = 1450
+        2. 04-Jun: Today's Collection = 0, Expenses = 0, Submitted = 0
+           -> Opening Balance = 1450, Net Cash In Hand = 1450 (NOT 1550, NOT double counted)
+        3. Immutability of past dates: modifying transactions on 03-Jun post-snapshot
+           does NOT alter the stored snapshot of 03-Jun or 04-Jun when queried as past dates.
+        """
+        from rest_framework.test import APIClient
+        client = APIClient()
+        
+        # We will use fixed dates: 03-Jun-2026 and 04-Jun-2026
+        date_1 = datetime.date(2026, 6, 3)
+        date_2 = datetime.date(2026, 6, 4)
+        
+        # 1. 03-Jun entries
+        p1 = PatientEntry.objects.create(
+            lab=self.lab, name="Patient A", age=30, gender="Male", phone="9999988888", total_bill=Decimal("2000.00"),
+            created_by=self.boy, created_at=date_1
+        )
+        
+        # Collection = 1550
+        PaymentTransaction.objects.create(
+            lab=self.lab, patient=p1, collection_boy=self.boy, amount_received=Decimal("1550.00"),
+            payment_mode="CASH", transaction_date=date_1
+        )
+        
+        # Expense = 100
+        Expense.objects.create(
+            lab=self.lab, title="Fuel 03-Jun", amount=Decimal("100.00"),
+            created_by=self.boy.username, date=date_1
+        )
+        
+        # Query 03-Jun dashboard stats as Collection Boy
+        client.force_authenticate(user=self.boy)
+        response_03 = client.get('/api/collection-dashboard/', {'lab_id': self.lab.id, 'date': date_1.isoformat()})
+        self.assertEqual(response_03.status_code, 200)
+        data_03 = response_03.json()
+        
+        # Success criteria for 03-Jun:
+        self.assertEqual(data_03['todays_collected'], 1550.0)
+        self.assertEqual(data_03['today_expenses'], 100.0)
+        self.assertEqual(data_03['submitted_cash_today'], 0.0)
+        self.assertEqual(data_03['net_cash_in_hand'], 1450.0)
+        
+        # 2. Query 04-Jun dashboard stats as Collection Boy
+        response_04 = client.get('/api/collection-dashboard/', {'lab_id': self.lab.id, 'date': date_2.isoformat()})
+        self.assertEqual(response_04.status_code, 200)
+        data_04 = response_04.json()
+        
+        # Success criteria for 04-Jun:
+        self.assertEqual(data_04['cash_not_submitted'], 1450.0)  # Opening balance
+        self.assertEqual(data_04['todays_collected'], 0.0)
+        self.assertEqual(data_04['today_expenses'], 0.0)
+        self.assertEqual(data_04['submitted_cash_today'], 0.0)
+        self.assertEqual(data_04['net_cash_in_hand'], 1450.0)    # Closing balance
+        
+        # 3. Add transaction to 03-Jun retrospectively
+        PaymentTransaction.objects.create(
+            lab=self.lab, patient=p1, collection_boy=self.boy, amount_received=Decimal("500.00"),
+            payment_mode="CASH", transaction_date=date_1
+        )
+        
+        # Query 03-Jun stats again: it must remain ₹1450 (the stored snapshot value)
+        response_03_re = client.get('/api/collection-dashboard/', {'lab_id': self.lab.id, 'date': date_1.isoformat()})
+        self.assertEqual(response_03_re.status_code, 200)
+        data_03_re = response_03_re.json()
+        self.assertEqual(data_03_re['net_cash_in_hand'], 1450.0)
+        
+        # Query 04-Jun stats again: it must also remain ₹1450 (the stored snapshot value)
+        response_04_re = client.get('/api/collection-dashboard/', {'lab_id': self.lab.id, 'date': date_2.isoformat()})
+        self.assertEqual(response_04_re.status_code, 200)
+        data_04_re = response_04_re.json()
+        self.assertEqual(data_04_re['cash_not_submitted'], 1450.0)
+        self.assertEqual(data_04_re['net_cash_in_hand'], 1450.0)
+
 

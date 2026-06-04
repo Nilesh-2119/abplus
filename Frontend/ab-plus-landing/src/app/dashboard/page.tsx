@@ -20,7 +20,9 @@ import {
   LogOut,
   RefreshCw,
   Stethoscope,
-  FolderCheck
+  FolderCheck,
+  Percent,
+  BarChart3
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -35,9 +37,11 @@ import LabSettings from "@/components/dashboard/LabSettings";
 import ReferredDoctors from "@/components/dashboard/ReferredDoctors";
 import CollectionBoyDashboard from "@/components/dashboard/CollectionBoyDashboard";
 import CashierDashboard from "@/components/dashboard/CashierDashboard";
+import CommissionReports from "@/components/dashboard/CommissionReports";
+import InformativeReports from "@/components/dashboard/InformativeReports";
 
 type UserRole = "SUPER_ADMIN" | "LAB_ADMIN" | "CASHIER" | "TECHNICIAN" | "COLLECTION_BOY";
-type TabId = "overview" | "workflow" | "received-samples" | "reports" | "tests" | "staff" | "logs" | "settings" | "doctors";
+type TabId = "overview" | "workflow" | "received-samples" | "reports" | "tests" | "staff" | "logs" | "settings" | "doctors" | "commission" | "informative-reports";
 
 interface NavItem {
   id: TabId;
@@ -49,7 +53,9 @@ const ALL_NAV_ITEMS: NavItem[] = [
   { id: "overview", label: "Overview", icon: LayoutDashboard },
   { id: "workflow", label: "Patient Workflow", icon: ClipboardList },
   { id: "received-samples", label: "Received Samples", icon: FolderCheck },
+  { id: "informative-reports", label: "Informative Reports", icon: BarChart3 },
   { id: "reports", label: "Reports Portal", icon: Printer },
+  { id: "commission", label: "Commission Reports", icon: Percent },
   { id: "tests", label: "Test Catalog", icon: Beaker },
   { id: "staff", label: "Staff Directory", icon: Users },
   { id: "doctors", label: "Referred Doctors", icon: Stethoscope },
@@ -120,7 +126,7 @@ function LabDashboardContent() {
       });
 
     const tabParam = searchParams.get("tab") as TabId;
-    if (tabParam && ["overview", "workflow", "received-samples", "reports", "tests", "staff", "logs", "settings", "doctors"].includes(tabParam)) {
+    if (tabParam && ["overview", "workflow", "received-samples", "reports", "tests", "staff", "logs", "settings", "doctors", "commission", "informative-reports"].includes(tabParam)) {
       setActiveTab(tabParam);
     }
   }, [searchParams, router]);
@@ -134,7 +140,7 @@ function LabDashboardContent() {
   const getAllowedTabs = (): TabId[] => {
     switch (currentRole) {
       case "LAB_ADMIN":
-        return ["overview", "workflow", "reports", "tests", "staff", "doctors", "logs", "settings"];
+        return ["overview", "workflow", "informative-reports", "reports", "commission", "tests", "staff", "doctors", "logs", "settings"];
       case "CASHIER":
         return ["overview", "workflow", "reports", "logs"];
       case "TECHNICIAN":
@@ -190,8 +196,12 @@ function LabDashboardContent() {
       case "received-samples":
         // Show user name + role instead of generic title
         return null; // rendered separately below
+      case "informative-reports":
+        return "Informative Reports Center";
       case "reports":
         return "Lab Reports Portal";
+      case "commission":
+        return "Doctor Commission Reports";
       case "tests":
         return "Diagnostic Catalog & Ranges";
       case "staff":
@@ -442,6 +452,12 @@ function LabDashboardContent() {
                 )}
                 {activeTab === "reports" && (
                   <ReportsSection labId={labId} currentRole={currentRole} />
+                )}
+                {activeTab === "informative-reports" && (
+                  <InformativeReports labId={labId} currentRole={currentRole} />
+                )}
+                {activeTab === "commission" && (
+                  <CommissionReports labId={labId} currentRole={currentRole} />
                 )}
                 {activeTab === "tests" && (
                   <TestManagement labId={labId} currentRole={currentRole} />

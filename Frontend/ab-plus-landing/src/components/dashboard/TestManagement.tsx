@@ -48,6 +48,7 @@ export default function TestManagement({ labId, currentRole }: TestProps) {
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [activeTest, setActiveTest] = useState<PathologyTest | null>(null);
   const [editPrice, setEditPrice] = useState("");
+  const [editCommission, setEditCommission] = useState("50");
   const [editParams, setEditParams] = useState<TestParameter[]>([]);
 
   // Custom Test Creator state
@@ -56,6 +57,7 @@ export default function TestManagement({ labId, currentRole }: TestProps) {
   const [newCode, setNewCode] = useState("");
   const [newCategory, setNewCategory] = useState("General");
   const [newPrice, setNewPrice] = useState("");
+  const [newCommission, setNewCommission] = useState("50");
   const [newTubeType, setNewTubeType] = useState("EDTA");
   const [newTubeColor, setNewTubeColor] = useState("Purple");
   
@@ -103,6 +105,7 @@ export default function TestManagement({ labId, currentRole }: TestProps) {
   const handleOpenEdit = (test: PathologyTest) => {
     setActiveTest(test);
     setEditPrice(test.price.toString());
+    setEditCommission((test.commission_percentage !== undefined ? test.commission_percentage : 50).toString());
     setEditParams(test.parameters.map((p) => ({ ...p })));
     setEditModalOpen(true);
   };
@@ -140,10 +143,14 @@ export default function TestManagement({ labId, currentRole }: TestProps) {
 
     setSaving(true);
     try {
-      await apiService.updateTest(labId, activeTest.id, {
+      const updatePayload: any = {
         price: Number(editPrice),
         parameters: editParams
-      });
+      };
+      if (currentRole === "LAB_ADMIN") {
+        updatePayload.commission_percentage = Number(editCommission);
+      }
+      await apiService.updateTest(labId, activeTest.id, updatePayload);
       setEditModalOpen(false);
       fetchTests();
     } catch (e) {
@@ -210,7 +217,7 @@ export default function TestManagement({ labId, currentRole }: TestProps) {
         max_val: Number(p.max_val)
       }));
 
-      await apiService.createCustomTest(labId, {
+      const createPayload: any = {
         name: newName,
         code: newCode,
         category: newCategory,
@@ -218,13 +225,19 @@ export default function TestManagement({ labId, currentRole }: TestProps) {
         tube_type: newTubeType,
         tube_color: newTubeColor,
         parameters: testParameters
-      });
+      };
+      if (currentRole === "LAB_ADMIN") {
+        createPayload.commission_percentage = Number(newCommission);
+      }
+
+      await apiService.createCustomTest(labId, createPayload);
 
       // Reset
       setNewName("");
       setNewCode("");
       setNewCategory("General");
       setNewPrice("");
+      setNewCommission("50");
       setNewTubeType("EDTA");
       setNewTubeColor("Purple");
       setParameters([{ name: "Parameter 1", unit: "mg/dL", min_val: 70, max_val: 110 }]);
@@ -605,7 +618,7 @@ export default function TestManagement({ labId, currentRole }: TestProps) {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className={`grid grid-cols-1 ${currentRole === "LAB_ADMIN" ? "sm:grid-cols-3" : "sm:grid-cols-2"} gap-4`}>
                   <div>
                     <label className="block text-xs font-extrabold text-slate-400 uppercase tracking-wide">
                       Vial Cap / Tube Type
@@ -630,6 +643,23 @@ export default function TestManagement({ labId, currentRole }: TestProps) {
                       className="w-full mt-1.5 rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-cyan-500/20 disabled:bg-slate-50 disabled:text-slate-500 disabled:cursor-not-allowed"
                     />
                   </div>
+                  {currentRole === "LAB_ADMIN" && (
+                    <div>
+                      <label className="block text-xs font-extrabold text-slate-400 uppercase tracking-wide">
+                        Commission Percentage (%)
+                      </label>
+                      <input
+                        type="number"
+                        required
+                        min="0"
+                        max="100"
+                        placeholder="Commission %"
+                        value={editCommission}
+                        onChange={(e) => setEditCommission(e.target.value)}
+                        className="w-full mt-1.5 rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-cyan-500/20"
+                      />
+                    </div>
+                  )}
                 </div>
 
                 {/* Edit Parameter reference range override fields */}
@@ -832,7 +862,7 @@ export default function TestManagement({ labId, currentRole }: TestProps) {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
+                <div className={`grid grid-cols-1 sm:grid-cols-2 ${currentRole === "LAB_ADMIN" ? "md:grid-cols-5" : "md:grid-cols-4"} gap-3`}>
                   <div>
                     <label className="block text-xs font-extrabold text-slate-400 uppercase tracking-wide">
                       Category
@@ -867,6 +897,24 @@ export default function TestManagement({ labId, currentRole }: TestProps) {
                       className="w-full mt-1.5 rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-cyan-500/20"
                     />
                   </div>
+
+                  {currentRole === "LAB_ADMIN" && (
+                    <div>
+                      <label className="block text-xs font-extrabold text-slate-400 uppercase tracking-wide">
+                        Commission (%)
+                      </label>
+                      <input
+                        type="number"
+                        required
+                        min="0"
+                        max="100"
+                        placeholder="Commission %"
+                        value={newCommission}
+                        onChange={(e) => setNewCommission(e.target.value)}
+                        className="w-full mt-1.5 rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-cyan-500/20"
+                      />
+                    </div>
+                  )}
 
                   <div>
                     <label className="block text-xs font-extrabold text-slate-400 uppercase tracking-wide">

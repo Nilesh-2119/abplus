@@ -9,7 +9,11 @@ from .views import (
     EmployeeViewSet, TestViewSet, PatientViewSet, ExpenseViewSet,
     LabSettingsView, LabActivityLogViewSet, MasterTestViewSet, LoginView,
     ReferredDoctorViewSet, ProfileView, CollectionDashboardStatsView,
-    ChangePasswordView, DailyCloseoutViewSet, CashierAdminSettlementViewSet
+    ChangePasswordView, DailyCloseoutViewSet, CashierAdminSettlementViewSet,
+    CommissionDashboardStatsView, CommissionReportsView, CommissionSettleView,
+    DoctorCommissionDetailView,
+    CommissionReportPreviewView, CommissionReportPDFView, CommissionReportExcelView,
+    InformativeReportsListView, InformativeReportPreviewView, InformativeReportExportView
 )
 
 # Create a DRF Router and register viewsets
@@ -52,5 +56,21 @@ urlpatterns = [
     
     # Collection Boy dashboard analytics endpoint
     path('collection-dashboard/', CollectionDashboardStatsView.as_view(), name='collection-dashboard'),
+
+    # Doctor Commission Management Endpoints
+    path('commission/stats/', CommissionDashboardStatsView.as_view(), name='commission-stats'),
+    path('commission/reports/', CommissionReportsView.as_view(), name='commission-reports'),
+    path('commission/settle/', CommissionSettleView.as_view(), name='commission-settle'),
+    path('commission/doctor/<str:doctor_id>/', DoctorCommissionDetailView.as_view(), name='commission-doctor-detail'),
+
+    # Commission Report Export Endpoints
+    path('commission/report-preview/', CommissionReportPreviewView.as_view(), name='commission-report-preview'),
+    path('commission/export-pdf/', CommissionReportPDFView.as_view(), name='commission-export-pdf'),
+    path('commission/export-excel/', CommissionReportExcelView.as_view(), name='commission-export-excel'),
+
+    # Informative Reports Endpoints
+    path('informative-reports/', InformativeReportsListView.as_view(), name='informative-reports-list'),
+    path('informative-reports/preview/', InformativeReportPreviewView.as_view(), name='informative-reports-preview'),
+    path('informative-reports/export/', InformativeReportExportView.as_view(), name='informative-reports-export'),
 ]
 
