@@ -437,128 +437,122 @@ export default function ReportsSection({ labId, currentRole }: ReportsProps) {
         }
         @media screen {
           .preview-page-card {
-            zoom: 0.55;
+            zoom: 0.8;
           }
         }
       `}</style>
 
-      {/* ── Search Toolbar ── */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white/70 border border-slate-200/80 p-3 sm:p-4 rounded-2xl backdrop-blur-md shadow-sm">
-        <div className="flex-1 max-w-sm relative">
-          <Search size={14} className="absolute left-3.5 top-2.5 text-slate-400" />
-          <input
-            type="text"
-            placeholder="Search patient name, phone..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-9 pr-4 py-2 rounded-xl border border-slate-200 bg-white text-xs font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-cyan-500/20"
-          />
-        </div>
-        <button
-          onClick={fetchData}
-          className="p-2 border border-slate-200 hover:bg-slate-50 text-slate-400 hover:text-slate-600 rounded-xl transition-colors bg-white shadow-sm"
-          title="Refresh"
-        >
-          <RefreshCw size={14} />
-        </button>
-      </div>
-
       {errorMsg && (
-        <div className="flex items-center gap-2 p-3 text-xs font-bold text-red-600 bg-red-50 border border-red-100 rounded-xl">
+        <div className="flex items-center gap-2 p-3 text-xs font-bold text-red-600 bg-red-50 border border-red-100 rounded-xl mb-3 shrink-0">
           <AlertCircle size={14} />
           <span>{errorMsg}</span>
         </div>
       )}
 
       {/* ── Main Two-Column Layout ── */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4" style={{ height: "calc(100vh - 200px)", minHeight: "560px" }}>
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4" style={{ height: "calc(100vh - 130px)", minHeight: "600px" }}>
 
-        {/* LEFT: Patient List */}
-        <div className="lg:col-span-4 bg-white border border-slate-200/80 rounded-2xl shadow-sm flex flex-col overflow-hidden">
-          <div className="px-4 py-3 border-b border-slate-100 flex items-center gap-2 shrink-0">
-            <BookOpen size={14} className="text-cyan-500" />
-            <h3 className="text-[11px] font-black text-slate-800 uppercase tracking-wide">Pathology Reports List</h3>
+        {/* LEFT: Patient List & Controls */}
+        <div className="lg:col-span-4 flex flex-col gap-3 h-full overflow-hidden animate-fade-in">
+          {/* 1. Search Patient */}
+          <div className="relative shrink-0">
+            <Search size={14} className="absolute left-3.5 top-3 text-slate-400" />
+            <input
+              type="text"
+              placeholder="Search patient name, phone..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full pl-9 pr-4 py-2.5 rounded-xl border border-slate-200 bg-white text-xs font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-cyan-500/20 shadow-sm"
+            />
           </div>
 
-          <div className="flex-1 overflow-y-auto p-3 space-y-2">
-            {loading ? (
-              <div className="flex h-36 items-center justify-center text-slate-400">
-                <RefreshCw size={16} className="animate-spin text-cyan-500" />
-                <span className="ml-2 font-semibold text-xs">Loading...</span>
+          {/* 2. Print Report Layout Button */}
+          <button
+            onClick={handlePrint}
+            disabled={!activePatient}
+            className="w-full flex items-center justify-center gap-2 shrink-0 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 px-4 py-2.5 text-xs font-bold text-white shadow-md shadow-cyan-500/20 hover:shadow-lg hover:shadow-cyan-500/30 transition-all cursor-pointer active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none"
+          >
+            <Printer size={13} />
+            <span>Print Report Layout</span>
+          </button>
+
+          {/* 3. Pathology Reports List Card */}
+          <div className="flex-1 bg-white border border-slate-200/80 rounded-2xl shadow-sm flex flex-col overflow-hidden">
+            <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between shrink-0">
+              <div className="flex items-center gap-2">
+                <BookOpen size={14} className="text-cyan-500" />
+                <h3 className="text-[11px] font-black text-slate-800 uppercase tracking-wide">Pathology Reports List</h3>
               </div>
-            ) : patients.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-12 text-slate-400 text-center">
-                <FileText size={28} className="stroke-1 mb-2" />
-                <span className="text-[10px] font-bold">No verified reports found.</span>
-              </div>
-            ) : (
-              patients.map((pat) => {
-                const isActive = activePatient?.id === pat.id;
-                return (
-                  <button
-                    key={pat.id}
-                    onClick={() => setActivePatient(pat)}
-                    className={`w-full flex items-center justify-between p-3 rounded-xl border text-left transition-all cursor-pointer ${
-                      isActive
-                        ? "bg-cyan-50 border-cyan-400 shadow-sm shadow-cyan-100"
-                        : "bg-white border-slate-100 hover:bg-slate-50 hover:border-slate-200"
-                    }`}
-                  >
-                    <div className="space-y-0.5 min-w-0 flex-1">
-                      <span className={`block text-xs font-bold truncate ${isActive ? "text-cyan-700" : "text-slate-800"}`}>
-                        {pat.name}
-                      </span>
-                      <span className="block text-[8px] font-mono font-black text-slate-400 uppercase tracking-wide">
-                        {pat.id} • {pat.age}y • {pat.gender}
-                      </span>
-                      <span className="text-[8px] text-slate-400 font-semibold">
-                        {pat.tests.length} test{pat.tests.length !== 1 ? "s" : ""}
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-1.5 shrink-0 ml-2">
-                      <span className={`text-[7px] font-extrabold px-1.5 py-0.5 rounded-lg uppercase tracking-wider ${
-                        pat.status === "DELIVERED"
-                          ? "bg-emerald-50 text-emerald-600 border border-emerald-100"
-                          : "bg-cyan-50 text-cyan-600 border border-cyan-100"
-                      }`}>
-                        {pat.status}
-                      </span>
-                      {isActive ? (
-                        <CheckCircle2 size={13} className="text-cyan-500" />
-                      ) : (
-                        <Eye size={12} className="text-slate-300" />
-                      )}
-                    </div>
-                  </button>
-                );
-              })
-            )}
+              <button
+                onClick={fetchData}
+                className="p-1 border border-slate-100 hover:bg-slate-50 text-slate-400 hover:text-slate-600 rounded-lg transition-colors bg-white"
+                title="Refresh List"
+              >
+                <RefreshCw size={11} className={loading ? "animate-spin text-cyan-500" : ""} />
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-3 space-y-2">
+              {loading ? (
+                <div className="flex h-36 items-center justify-center text-slate-400">
+                  <RefreshCw size={16} className="animate-spin text-cyan-500" />
+                  <span className="ml-2 font-semibold text-xs">Loading...</span>
+                </div>
+              ) : patients.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-12 text-slate-400 text-center">
+                  <FileText size={28} className="stroke-1 mb-2" />
+                  <span className="text-[10px] font-bold">No verified reports found.</span>
+                </div>
+              ) : (
+                patients.map((pat) => {
+                  const isActive = activePatient?.id === pat.id;
+                  return (
+                    <button
+                      key={pat.id}
+                      onClick={() => setActivePatient(pat)}
+                      className={`w-full flex items-center justify-between p-3 rounded-xl border text-left transition-all cursor-pointer ${
+                        isActive
+                          ? "bg-cyan-50 border-cyan-400 shadow-sm shadow-cyan-100"
+                          : "bg-white border-slate-100 hover:bg-slate-50 hover:border-slate-200"
+                      }`}
+                    >
+                      <div className="space-y-0.5 min-w-0 flex-1">
+                        <span className={`block text-xs font-bold truncate ${isActive ? "text-cyan-700" : "text-slate-800"}`}>
+                          {pat.name}
+                        </span>
+                        <span className="block text-[8px] font-mono font-black text-slate-400 uppercase tracking-wide">
+                          {pat.id} • {pat.age}y • {pat.gender}
+                        </span>
+                        <span className="text-[8px] text-slate-400 font-semibold">
+                          {pat.tests.length} test{pat.tests.length !== 1 ? "s" : ""}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-1.5 shrink-0 ml-2">
+                        <span className={`text-[7px] font-extrabold px-1.5 py-0.5 rounded-lg uppercase tracking-wider ${
+                          pat.status === "DELIVERED"
+                            ? "bg-emerald-50 text-emerald-600 border border-emerald-100"
+                            : "bg-cyan-50 text-cyan-600 border border-cyan-100"
+                        }`}>
+                          {pat.status}
+                        </span>
+                        {isActive ? (
+                          <CheckCircle2 size={13} className="text-cyan-500" />
+                        ) : (
+                          <Eye size={12} className="text-slate-300" />
+                        )}
+                      </div>
+                    </button>
+                  );
+                })
+              )}
+            </div>
           </div>
         </div>
 
         {/* RIGHT: Page-Scroll Report Preview */}
-        <div className="lg:col-span-8 flex flex-col gap-3 overflow-hidden">
+        <div className="lg:col-span-8 flex flex-col h-full overflow-hidden">
           {activePatient ? (
             <>
-              {/* Report Control Bar */}
-              <div className="bg-white border border-slate-200/80 rounded-2xl px-4 py-3 shadow-sm flex items-center justify-between shrink-0">
-                <div className="flex items-center gap-3">
-                  <div>
-                    <span className="text-[9px] font-extrabold text-slate-400 uppercase tracking-wider block">Selected File</span>
-                    <h4 className="text-xs font-black text-slate-800">{activePatient.name}
-                      <span className="text-slate-400 font-mono ml-1.5">({activePatient.id})</span>
-                    </h4>
-                  </div>
-                </div>
-                <button
-                  onClick={handlePrint}
-                  className="flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 px-4 py-2 text-xs font-bold text-white shadow-md shadow-cyan-500/20 hover:shadow-lg hover:shadow-cyan-500/30 transition-all cursor-pointer active:scale-95"
-                >
-                  <Printer size={13} />
-                  <span>Print Report Layout</span>
-                </button>
-              </div>
-
               {/* Scrollable Pages Container */}
               <div
                 ref={scrollContainerRef}
