@@ -618,11 +618,11 @@ export default function PatientWorkflow({ labId, currentRole, userName = "Staff"
       {/* ── Technician Sub-Filters (Only shown when on Received Samples tab) ── */}
       {currentRole === "TECHNICIAN" && techTab === "received" && (
         <div className="flex items-center gap-2 bg-slate-100/50 border border-slate-200/50 p-2 rounded-xl shadow-inner max-w-fit animate-fade-in">
-          <span className="text-[9px] font-black uppercase tracking-wider text-slate-400 px-2">Filter Reports:</span>
+          <span className="text-[9px] font-black uppercase tracking-wider text-slate-400 px-2">Filter Blood Reports:</span>
           {[
             { id: "ALL", label: "All Received" },
-            { id: "PENDING", label: "Report Pending" },
-            { id: "DONE", label: "Report Done" }
+            { id: "PENDING", label: "Blood Report Pending" },
+            { id: "DONE", label: "Blood Report Done" }
           ].map(sub => (
             <button
               key={sub.id}
@@ -709,7 +709,7 @@ export default function PatientWorkflow({ labId, currentRole, userName = "Staff"
                             }}
                             className="px-4 py-2 text-xs font-bold text-white bg-gradient-to-r from-cyan-500 to-blue-500 rounded-xl hover:from-cyan-600 hover:to-blue-600 active:scale-95 transition-all shadow-sm shadow-cyan-500/10 cursor-pointer"
                           >
-                            Make Report
+                             Make Blood Report
                           </button>
                         ) : (pat.status === "COMPLETED" || pat.status === "DELIVERED") ? (
                           <span className="px-3.5 py-2 text-xs font-black bg-emerald-50 text-emerald-600 border border-emerald-100 rounded-xl flex items-center gap-1.5 select-none">
@@ -1035,12 +1035,12 @@ export default function PatientWorkflow({ labId, currentRole, userName = "Staff"
                         }`}
                         title={
                           drawerPatient.status === "DELIVERED"
-                            ? "Report already given"
-                            : "Mark report as delivered"
+                            ? "Blood report already given"
+                            : "Mark blood report as delivered"
                         }
                       >
                         <CheckCircle size={16} />
-                        <span>{drawerPatient.status === "DELIVERED" ? "Report Given (Delivered)" : "Report Given"}</span>
+                        <span>{drawerPatient.status === "DELIVERED" ? "Blood Report Given (Delivered)" : "Blood Report Given"}</span>
                       </button>
                     </div>
                   )}

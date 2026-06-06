@@ -488,7 +488,7 @@ export default function ReportsSection({ labId, currentRole }: ReportsProps) {
             className="w-full flex items-center justify-center gap-2 shrink-0 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 px-4 py-2.5 text-xs font-bold text-white shadow-md shadow-cyan-500/20 hover:shadow-lg hover:shadow-cyan-500/30 transition-all cursor-pointer active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none"
           >
             <Printer size={13} />
-            <span>Print Report Layout</span>
+            <span>Print Blood Report</span>
           </button>
 
           {/* 3. Pathology Reports List Card */}
@@ -496,7 +496,7 @@ export default function ReportsSection({ labId, currentRole }: ReportsProps) {
             <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between shrink-0">
               <div className="flex items-center gap-2">
                 <BookOpen size={14} className="text-cyan-500" />
-                <h3 className="text-[11px] font-black text-slate-800 uppercase tracking-wide">Pathology Reports List</h3>
+                <h3 className="text-[11px] font-black text-slate-800 uppercase tracking-wide">Blood Reports List</h3>
               </div>
               <button
                 onClick={() => fetchData()}
@@ -516,7 +516,7 @@ export default function ReportsSection({ labId, currentRole }: ReportsProps) {
               ) : patients.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-12 text-slate-400 text-center">
                   <FileText size={28} className="stroke-1 mb-2" />
-                  <span className="text-[10px] font-bold">No verified reports found.</span>
+                  <span className="text-[10px] font-bold">No verified blood reports found.</span>
                 </div>
               ) : (
                 patients.map((pat) => {
@@ -891,9 +891,9 @@ export default function ReportsSection({ labId, currentRole }: ReportsProps) {
               <div className="h-16 w-16 bg-slate-50 border border-slate-100 rounded-2xl flex items-center justify-center mb-4">
                 <BookOpen size={28} className="stroke-1 text-slate-300" />
               </div>
-              <h3 className="font-syne text-[13px] font-extrabold text-slate-700 mb-1">No Report Selected</h3>
+              <h3 className="font-syne text-[13px] font-extrabold text-slate-700 mb-1">No Blood Report Selected</h3>
               <p className="text-[10px] text-slate-400 font-semibold max-w-xs">
-                Select a completed patient report from the list to preview it page by page.
+                Select a completed blood report from the list to preview it page by page.
               </p>
               <div className="flex items-center gap-2 mt-4 text-[9px] text-slate-400 font-semibold">
                 <ChevronLeft size={11} />

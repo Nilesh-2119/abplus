@@ -54,7 +54,7 @@ const ALL_NAV_ITEMS: NavItem[] = [
   { id: "workflow", label: "Patient Workflow", icon: ClipboardList },
   { id: "received-samples", label: "Received Samples", icon: FolderCheck },
   { id: "informative-reports", label: "Informative Reports", icon: BarChart3 },
-  { id: "reports", label: "Reports Portal", icon: Printer },
+  { id: "reports", label: "Blood Reports", icon: Printer },
   { id: "commission", label: "Commission Reports", icon: Percent },
   { id: "tests", label: "Test Catalog", icon: Beaker },
   { id: "staff", label: "Staff Directory", icon: Users },
@@ -199,7 +199,7 @@ function LabDashboardContent() {
       case "informative-reports":
         return "Informative Reports Center";
       case "reports":
-        return "Lab Reports Portal";
+        return "Blood Reports Portal";
       case "commission":
         return "Doctor Commission Reports";
       case "tests":
