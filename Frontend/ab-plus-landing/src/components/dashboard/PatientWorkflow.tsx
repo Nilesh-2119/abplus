@@ -1039,27 +1039,48 @@ export default function PatientWorkflow({ labId, currentRole, userName = "Staff"
                   )}
 
                   {/* ── REPORT GIVEN BUTTON (hidden for CASHIER/TECHNICIAN) ── */}
-                  {currentRole !== "CASHIER" && currentRole !== "TECHNICIAN" && (
-                    <div className="relative">
-                      <button
-                        onClick={() => handleDeliverReport(drawerPatient)}
-                        disabled={drawerPatient.status === "DELIVERED"}
-                        className={`w-full flex items-center justify-center gap-2 rounded-xl py-3.5 text-sm font-bold text-white shadow-md transition-all ${
-                          drawerPatient.status === "DELIVERED"
-                            ? "bg-emerald-600 cursor-not-allowed opacity-90"
-                            : "bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 active:scale-[0.99] cursor-pointer"
-                        }`}
-                        title={
-                          drawerPatient.status === "DELIVERED"
-                            ? "Blood report already given"
-                            : "Mark blood report as delivered"
-                        }
-                      >
-                        <CheckCircle size={16} />
-                        <span>{drawerPatient.status === "DELIVERED" ? "Blood Report Given (Delivered)" : "Blood Report Given"}</span>
-                      </button>
-                    </div>
-                  )}
+                  {currentRole !== "CASHIER" && currentRole !== "TECHNICIAN" && (() => {
+                    const isReady     = drawerPatient.status === "COMPLETED";
+                    const isDelivered = drawerPatient.status === "DELIVERED";
+                    const isDisabled  = !isReady && !isDelivered; // not ready yet
+                    return (
+                      <div className="relative">
+                        <button
+                          onClick={() => handleDeliverReport(drawerPatient)}
+                          disabled={isDisabled || isDelivered}
+                          className={`w-full flex items-center justify-center gap-2 rounded-xl py-3.5 text-sm font-bold text-white shadow-md transition-all ${
+                            isDelivered
+                              ? "bg-emerald-600 cursor-not-allowed opacity-90"
+                              : isDisabled
+                                ? "bg-slate-300 cursor-not-allowed opacity-70"
+                                : "bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 active:scale-[0.99] cursor-pointer"
+                          }`}
+                          title={
+                            isDelivered
+                              ? "Blood report already given to patient"
+                              : isDisabled
+                                ? "Blood report is not ready yet — technician must complete the report first"
+                                : "Mark blood report as given to patient"
+                          }
+                        >
+                          <CheckCircle size={16} />
+                          <span>
+                            {isDelivered
+                              ? "Blood Report Given (Delivered)"
+                              : isDisabled
+                                ? "🔒 Blood Report Not Ready Yet"
+                                : "Blood Report Given"}
+                          </span>
+                        </button>
+                        {/* Hint text shown only when report isn't ready */}
+                        {isDisabled && (
+                          <p className="text-center text-[10px] font-semibold text-slate-400 mt-1.5">
+                            Waiting for technician to complete the blood report
+                          </p>
+                        )}
+                      </div>
+                    );
+                  })()}
 
                   {/* ── DELETE PATIENT BUTTON (hidden for CASHIER/TECHNICIAN) ── */}
                   {currentRole !== "CASHIER" && currentRole !== "TECHNICIAN" && (
