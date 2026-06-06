@@ -937,27 +937,39 @@ class PatientViewSet(SoftDeleteViewSetMixin, viewsets.ModelViewSet):
 
         patient = self.get_object()
         new_results = request.data.get('results', {})
-        
+        is_draft = request.data.get('is_draft', False)
+
         if not patient.results:
             patient.results = {}
         patient.results.update(new_results)
-        patient.status = 'COMPLETED'
-        patient.save()
 
-        # Update/Create Report
-        Report.objects.update_or_create(
-            patient=patient,
-            defaults={
-                'status': 'COMPLETED',
-                'signed_by': 'Verified'
-            }
-        )
+        if not is_draft:
+            # Final save: mark as completed and create/update the Report record
+            patient.status = 'COMPLETED'
+            patient.save()
 
-        ActivityLog.objects.create(
-            action=f"Technician entered test results for {patient.name}",
-            user_email=(request.user.email or f"{request.user.username}@abplus.in") if request.user.is_authenticated else "tech@abplus.in",
-            lab_name=patient.lab.name
-        )
+            Report.objects.update_or_create(
+                patient=patient,
+                defaults={
+                    'status': 'COMPLETED',
+                    'signed_by': 'Verified'
+                }
+            )
+
+            ActivityLog.objects.create(
+                action=f"Technician entered test results for {patient.name}",
+                user_email=(request.user.email or f"{request.user.username}@abplus.in") if request.user.is_authenticated else "tech@abplus.in",
+                lab_name=patient.lab.name
+            )
+        else:
+            # Draft save: keep status as LAB_RECEIVED, just persist partial results
+            patient.save()
+
+            ActivityLog.objects.create(
+                action=f"Technician saved draft results for {patient.name}",
+                user_email=(request.user.email or f"{request.user.username}@abplus.in") if request.user.is_authenticated else "tech@abplus.in",
+                lab_name=patient.lab.name
+            )
 
         return Response(PatientEntrySerializer(patient).data)
 

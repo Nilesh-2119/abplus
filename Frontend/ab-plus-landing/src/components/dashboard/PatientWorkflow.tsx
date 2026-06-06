@@ -108,6 +108,7 @@ export default function PatientWorkflow({ labId, currentRole, userName = "Staff"
   const [resultsModalOpen, setResultsModalOpen] = useState(false);
   const [resultsPatient, setResultsPatient] = useState<PatientEntry | null>(null);
   const [resultsData, setResultsData] = useState<Record<string, number | string>>({});
+  const [savingDraft, setSavingDraft] = useState(false);
 
   // Edit Patient Modal State
   const [editModalOpen, setEditModalOpen] = useState(false);
@@ -408,6 +409,19 @@ export default function PatientWorkflow({ labId, currentRole, userName = "Staff"
       setResultsModalOpen(false);
       fetchAll();
     } catch { setErrorMsg("Failed to save results."); }
+  };
+
+  // Save Draft: saves whatever values are filled so far WITHOUT marking report as complete.
+  // Patient stays in LAB_RECEIVED so technician can reopen and fill remaining values later.
+  const handleSaveDraft = async () => {
+    if (!resultsPatient) return;
+    setSavingDraft(true);
+    try {
+      await apiService.saveTestResults(resultsPatient.id, resultsData, true); // true = draft mode
+      setResultsModalOpen(false);
+      fetchAll();
+    } catch { setErrorMsg("Failed to save draft."); }
+    finally { setSavingDraft(false); }
   };
 
   const handleSelectTestToggle = (test: PathologyTest) => {
@@ -1339,6 +1353,13 @@ export default function PatientWorkflow({ labId, currentRole, userName = "Staff"
                 </div>
                 <button onClick={() => setResultsModalOpen(false)} className="text-slate-400 hover:text-slate-600"><X size={18} /></button>
               </div>
+              {/* Draft info banner */}
+              <div className="flex items-start gap-2 bg-amber-50 border border-amber-200/70 rounded-xl px-3 py-2 mb-2">
+                <span className="text-amber-500 mt-0.5 shrink-0">💡</span>
+                <p className="text-[10px] font-semibold text-amber-700 leading-relaxed">
+                  You can <strong>Save as Draft</strong> with partial values (e.g. only Fasting) and come back later to fill the rest (e.g. PP). The report will not be marked complete until you click <strong>Verify and Log Results</strong>.
+                </p>
+              </div>
               <form onSubmit={handleSaveResults} className="space-y-6">
                 {resultsPatient.tests.map(test => (
                   <div key={test.id} className="border border-slate-100 rounded-2xl p-4 bg-slate-50/30">
@@ -1350,27 +1371,38 @@ export default function PatientWorkflow({ labId, currentRole, userName = "Staff"
                       {test.parameters.map(param => {
                         const val = resultsData[param.id];
                         const flag = getParamFlag(val, param.min_val, param.max_val);
+                        const isFilled = val !== undefined && val !== "";
                         return (
-                          <div key={param.id} className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-2.5 rounded-xl border border-slate-100/50 bg-white">
+                          <div key={param.id} className={`flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-2.5 rounded-xl border bg-white transition-colors ${
+                            isFilled ? "border-cyan-100/70 bg-cyan-50/20" : "border-slate-100/50"
+                          }`}>
                             <div className="sm:w-1/3">
                               <span className="block text-xs font-bold text-slate-700">{param.name}</span>
                               <span className="block text-[8px] font-extrabold text-slate-400 uppercase mt-0.5">Ref: {param.min_val} – {param.max_val} {param.unit}</span>
                             </div>
                             <div className="flex items-center gap-3">
                               <div className="relative">
-                                <input type="text" required placeholder="Value"
+                                <input type="text" placeholder="Value (optional)"
                                   value={val === undefined || val === null ? "" : val}
                                   onChange={e => {
                                     const rawVal = e.target.value;
-                                    const parsed = parseFloat(rawVal);
-                                    const isNumeric = !isNaN(parsed) && rawVal.trim() === parsed.toString();
-                                    setResultsData({ ...resultsData, [param.id]: isNumeric ? parsed : rawVal });
+                                    if (rawVal === "") {
+                                      const next = { ...resultsData };
+                                      delete next[param.id];
+                                      setResultsData(next);
+                                    } else {
+                                      const parsed = parseFloat(rawVal);
+                                      const isNumeric = !isNaN(parsed) && rawVal.trim() === parsed.toString();
+                                      setResultsData({ ...resultsData, [param.id]: isNumeric ? parsed : rawVal });
+                                    }
                                   }}
-                                  className="w-28 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-cyan-500/20 text-right pr-8"
+                                  className={`w-28 rounded-lg border px-3 py-1.5 text-xs font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-cyan-500/20 text-right pr-8 transition-colors ${
+                                    isFilled ? "border-cyan-300 bg-white" : "border-slate-200"
+                                  }`}
                                 />
                                 <span className="absolute right-2.5 top-2 text-[9px] font-extrabold text-slate-400">{param.unit}</span>
                               </div>
-                              {val !== undefined && val !== "" && (
+                              {isFilled && (
                                 <span className={`text-[8px] font-extrabold px-2.5 py-1 rounded-full uppercase tracking-wider ${
                                   flag !== "NORMAL" ? "bg-rose-50 text-rose-600 border border-rose-100/50 animate-pulse" : "bg-slate-100 text-slate-400"
                                 }`}>{flag}</span>
@@ -1382,10 +1414,31 @@ export default function PatientWorkflow({ labId, currentRole, userName = "Staff"
                     </div>
                   </div>
                 ))}
-                <button type="submit"
-                  className="w-full flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-500 py-2.5 text-xs font-bold text-white shadow-md hover:shadow-lg transition-all cursor-pointer">
-                  <FileText size={14} /><span>Verify and Log Results</span>
-                </button>
+
+                {/* Action Buttons */}
+                <div className="flex items-center gap-3 pt-1">
+                  {/* Save Draft — saves partial results, keeps status as LAB_RECEIVED */}
+                  <button
+                    type="button"
+                    onClick={handleSaveDraft}
+                    disabled={savingDraft}
+                    className="flex-1 flex items-center justify-center gap-2 rounded-xl border-2 border-amber-400 bg-amber-50 py-2.5 text-xs font-bold text-amber-700 hover:bg-amber-100 active:scale-[0.98] transition-all cursor-pointer disabled:opacity-50"
+                  >
+                    {savingDraft ? (
+                      <><RefreshCw size={13} className="animate-spin" /><span>Saving...</span></>
+                    ) : (
+                      <><FileText size={13} /><span>Save as Draft</span></>
+                    )}
+                  </button>
+
+                  {/* Verify and Log — finalizes results and marks report COMPLETED */}
+                  <button
+                    type="submit"
+                    className="flex-1 flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-500 py-2.5 text-xs font-bold text-white shadow-md hover:shadow-lg active:scale-[0.98] transition-all cursor-pointer"
+                  >
+                    <FileText size={13} /><span>Verify &amp; Log Results</span>
+                  </button>
+                </div>
               </form>
             </motion.div>
           </div>

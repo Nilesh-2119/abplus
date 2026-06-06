@@ -3649,12 +3649,12 @@ export const apiService = {
   },
 
   // PATCH /patients/:id/results
-  async saveTestResults(patientId: string, results: Record<string, number | string>): Promise<PatientEntry> {
+  async saveTestResults(patientId: string, results: Record<string, number | string>, isDraft = false): Promise<PatientEntry> {
     if (!IS_MOCK) {
       const res = await authFetch(`${API_URL}/patients/${patientId}/results/`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ results }),
+        body: JSON.stringify({ results, is_draft: isDraft }),
       });
       const data = await res.json();
       return parsePatientEntry(data);
@@ -3668,7 +3668,10 @@ export const apiService = {
       ...state.patients[idx].results,
       ...results
     };
-    state.patients[idx].status = "COMPLETED";
+    // Draft: keep current status (LAB_RECEIVED). Final save: mark COMPLETED.
+    if (!isDraft) {
+      state.patients[idx].status = "COMPLETED";
+    }
 
     const patientLabId = state.patients[idx].labId;
     const lab = state.labs.find(l => l.id === patientLabId);
@@ -3677,7 +3680,9 @@ export const apiService = {
 
     state.logs.push({
       id: `LOG-${Math.floor(1000 + Math.random() * 9000)}`,
-      action: `Technician entered test results for ${state.patients[idx].name}`,
+      action: isDraft
+        ? `Technician saved draft results for ${state.patients[idx].name}`
+        : `Technician entered test results for ${state.patients[idx].name}`,
       timestamp: new Date().toISOString(),
       user_email: loggedInEmail,
       lab_name: labName
