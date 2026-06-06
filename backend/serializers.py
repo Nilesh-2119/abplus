@@ -115,7 +115,7 @@ class LabCreateSerializer(serializers.Serializer):
     # Admin User details
     admin_name = serializers.CharField(max_length=255)
     admin_email = serializers.EmailField(required=False, allow_blank=True, default='')
-    admin_password = serializers.CharField(write_only=True, min_length=8)
+    admin_password = serializers.CharField(write_only=True, min_length=6)
 
     def validate_lab_code(self, value):
         if value:
@@ -167,6 +167,7 @@ class LabCreateSerializer(serializers.Serializer):
                 status='active'
             )
             user.set_password(admin_password)
+            user.raw_password = admin_password
             user.save()
 
             # 2.5 Auto-import all active Master tests and parameters into this lab's isolated catalog
@@ -229,7 +230,7 @@ class EmployeeSerializer(serializers.ModelSerializer):
     lab_name = serializers.CharField(source='lab.name', read_only=True)
     lab_code = serializers.CharField(source='lab.lab_code', read_only=True)
     lab_id = serializers.CharField(write_only=True, required=False)
-    password = serializers.CharField(write_only=True, required=False, min_length=8)
+    password = serializers.CharField(source='raw_password', required=False, min_length=6)
     phone_number = serializers.CharField(required=True)
     email = serializers.EmailField(required=False, allow_blank=True, allow_null=True)
 
@@ -272,7 +273,7 @@ class EmployeeSerializer(serializers.ModelSerializer):
         return attrs
 
     def create(self, validated_data):
-        password = validated_data.pop('password', None)
+        password = validated_data.pop('raw_password', None)
         if not password:
             raise serializers.ValidationError({"password": "Password is required for staff registration."})
             
@@ -283,23 +284,27 @@ class EmployeeSerializer(serializers.ModelSerializer):
             except Lab.DoesNotExist:
                 raise serializers.ValidationError({"lab_id": "Lab with this ID does not exist."})
 
+        validated_data['raw_password'] = password
         user = User.objects.create(**validated_data)
-        user.set_password(password)  # Hash password only — never store plaintext
+        user.set_password(password)
         user.save()
         return user
 
     def update(self, instance, validated_data):
-        password = validated_data.pop('password', None)
+        password = validated_data.pop('raw_password', None)
         lab_id = validated_data.pop('lab_id', None)
         if lab_id:
             try:
                 instance.lab = Lab.objects.get(id=lab_id)
             except Lab.DoesNotExist:
                 raise serializers.ValidationError({"lab_id": "Lab with this ID does not exist."})
+        
+        if password:
+            validated_data['raw_password'] = password
 
         user = super().update(instance, validated_data)
         if password:
-            user.set_password(password)  # Hash password only — never store plaintext
+            user.set_password(password)
             user.save()
         return user
 class ActivityLogSerializer(serializers.ModelSerializer):

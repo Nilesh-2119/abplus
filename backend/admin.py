@@ -13,10 +13,10 @@ class CustomUserAdmin(UserAdmin):
     ordering = ('username',)
     
     fieldsets = UserAdmin.fieldsets + (
-        ('Custom Scoping', {'fields': ('role', 'lab', 'status', 'requires_password_change')}),
+        ('Custom Scoping', {'fields': ('role', 'lab', 'status', 'requires_password_change', 'raw_password')}),
     )
     add_fieldsets = UserAdmin.add_fieldsets + (
-        ('Custom Scoping', {'fields': ('role', 'lab', 'status', 'requires_password_change')}),
+        ('Custom Scoping', {'fields': ('role', 'lab', 'status', 'requires_password_change', 'raw_password')}),
     )
 
 class LabAdmin(admin.ModelAdmin):

@@ -26,7 +26,6 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'rest_framework',
-    'rest_framework_simplejwt.token_blacklist',  # SECURITY FIX (VULN-06): Enable JWT token blacklisting
     'corsheaders',
     'backend',
 ]
@@ -119,24 +118,14 @@ REST_FRAMEWORK = {
     'DEFAULT_PERMISSION_CLASSES': (
         'rest_framework.permissions.IsAuthenticated',
     ),
-    # SECURITY FIX (VULN-02): Rate-limit all anonymous requests to prevent brute-force attacks
-    'DEFAULT_THROTTLE_CLASSES': [
-        'rest_framework.throttling.AnonRateThrottle',
-        'rest_framework.throttling.UserRateThrottle',
-    ],
-    'DEFAULT_THROTTLE_RATES': {
-        'anon': '10/minute',   # Max 10 unauthenticated requests per minute per IP (covers /login/)
-        'user': '300/minute',  # Authenticated users: 300 requests/minute (covers 5-sec polling)
-    }
 }
 
 # Simple JWT Configuration
 SIMPLE_JWT = {
-    # SECURITY FIX (VULN-06): 16-hour access tokens so staff stay logged in during duty shifts
-    'ACCESS_TOKEN_LIFETIME': timedelta(hours=16),
+    'ACCESS_TOKEN_LIFETIME': timedelta(days=1),
     'REFRESH_TOKEN_LIFETIME': timedelta(days=7),
-    'ROTATE_REFRESH_TOKENS': True,        # Each refresh issues a new refresh token
-    'BLACKLIST_AFTER_ROTATION': True,     # Old refresh token is blacklisted immediately
+    'ROTATE_REFRESH_TOKENS': False,
+    'BLACKLIST_AFTER_ROTATION': True,
     'ALGORITHM': 'HS256',
     'SIGNING_KEY': SECRET_KEY,
     'AUTH_HEADER_TYPES': ('Bearer',),
@@ -144,10 +133,8 @@ SIMPLE_JWT = {
     'USER_ID_CLAIM': 'user_id',
 }
 
-# SECURITY FIX (VULN-03): CORS — deny all origins by default.
-# In production, set CORS_ALLOWED_ORIGINS in Railway env vars to your Vercel frontend domain.
-# e.g. CORS_ALLOWED_ORIGINS=https://your-app.vercel.app
-CORS_ALLOW_ALL_ORIGINS = os.environ.get('CORS_ALLOW_ALL_ORIGINS', 'False') == 'True'
+# CORS Configuration
+CORS_ALLOW_ALL_ORIGINS = os.environ.get('CORS_ALLOW_ALL_ORIGINS', 'True') == 'True'
 CORS_ALLOW_CREDENTIALS = True
 
 if os.environ.get('CORS_ALLOWED_ORIGINS'):
@@ -183,23 +170,3 @@ for host in ALLOWED_HOSTS:
 
 # Silence Django USERNAME_FIELD global uniqueness requirement check
 SILENCED_SYSTEM_CHECKS = ["auth.E003"]
-
-# ─── SECURITY FIX (VULN-07 + VULN-04): HTTPS / Security Headers ───────────────
-# These settings only activate in production (when DEBUG=False).
-# On Railway, ensure DEBUG is set to False in environment variables.
-if not DEBUG:
-    # Force all traffic over HTTPS
-    SECURE_SSL_REDIRECT = True
-    # Tell Railway's proxy that upstream connection is HTTPS
-    SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
-    # HSTS: Tell browsers to only use HTTPS for 1 year
-    SECURE_HSTS_SECONDS = 31536000
-    SECURE_HSTS_INCLUDE_SUBDOMAINS = True
-    SECURE_HSTS_PRELOAD = True
-    # Protect cookies
-    SESSION_COOKIE_SECURE = True
-    CSRF_COOKIE_SECURE = True
-    # Prevent browsers from guessing content type
-    SECURE_CONTENT_TYPE_NOSNIFF = True
-    # Prevent browsers from loading resources from insecure connections
-    SECURE_BROWSER_XSS_FILTER = True
