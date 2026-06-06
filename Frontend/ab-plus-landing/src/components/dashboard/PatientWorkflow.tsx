@@ -1360,7 +1360,20 @@ export default function PatientWorkflow({ labId, currentRole, userName = "Staff"
                   You can <strong>Save as Draft</strong> with partial values (e.g. only Fasting) and come back later to fill the rest (e.g. PP). The report will not be marked complete until you click <strong>Verify and Log Results</strong>.
                 </p>
               </div>
-              <form onSubmit={handleSaveResults} className="space-y-6">
+              {/* Flat ordered list of all param IDs — used for Enter-to-next-field navigation */}
+              {(() => {
+                // Build once per render; used by handleResultsKeyDown via closure
+                void (resultsPatient?.tests.flatMap(t => t.parameters.map(p => p.id)) ?? []);
+                return null;
+              })()}
+              <form
+                onSubmit={handleSaveResults}
+                onKeyDown={(e) => {
+                  // Block Enter from ever submitting the form — user must click a button
+                  if (e.key === 'Enter') e.preventDefault();
+                }}
+                className="space-y-6"
+              >
                 {resultsPatient.tests.map(test => (
                   <div key={test.id} className="border border-slate-100 rounded-2xl p-4 bg-slate-50/30">
                     <h4 className="text-xs font-black text-slate-800 pb-2 border-b border-slate-100 mb-3 flex items-center gap-1.5">
@@ -1382,7 +1395,10 @@ export default function PatientWorkflow({ labId, currentRole, userName = "Staff"
                             </div>
                             <div className="flex items-center gap-3">
                               <div className="relative">
-                                <input type="text" placeholder="Value (optional)"
+                                <input
+                                  type="text"
+                                  placeholder="Value (optional)"
+                                  data-param-id={param.id}
                                   value={val === undefined || val === null ? "" : val}
                                   onChange={e => {
                                     const rawVal = e.target.value;
@@ -1394,6 +1410,18 @@ export default function PatientWorkflow({ labId, currentRole, userName = "Staff"
                                       const parsed = parseFloat(rawVal);
                                       const isNumeric = !isNaN(parsed) && rawVal.trim() === parsed.toString();
                                       setResultsData({ ...resultsData, [param.id]: isNumeric ? parsed : rawVal });
+                                    }
+                                  }}
+                                  onKeyDown={e => {
+                                    if (e.key !== 'Enter') return;
+                                    e.preventDefault(); // never submit on Enter
+                                    // Move focus to the next param input in the modal
+                                    const allInputs = Array.from(
+                                      document.querySelectorAll<HTMLInputElement>('[data-param-id]')
+                                    );
+                                    const currentIdx = allInputs.findIndex(el => el.dataset.paramId === param.id);
+                                    if (currentIdx !== -1 && currentIdx + 1 < allInputs.length) {
+                                      allInputs[currentIdx + 1].focus();
                                     }
                                   }}
                                   className={`w-28 rounded-lg border px-3 py-1.5 text-xs font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-cyan-500/20 text-right pr-8 transition-colors ${
