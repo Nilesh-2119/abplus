@@ -89,10 +89,12 @@ export default function ReportsSection({ labId, currentRole }: ReportsProps) {
     window.print();
   };
 
-  const getParamFlag = (value: number | undefined, min: number, max: number): "LOW" | "HIGH" | "NORMAL" | "" => {
-    if (value === undefined || isNaN(value)) return "";
-    if (value < min) return "LOW";
-    if (value > max) return "HIGH";
+  const getParamFlag = (value: any, min: number, max: number): "LOW" | "HIGH" | "NORMAL" | "" => {
+    if (value === undefined || value === null || value === "") return "";
+    const num = typeof value === "number" ? value : parseFloat(value);
+    if (isNaN(num)) return "";
+    if (num < min) return "LOW";
+    if (num > max) return "HIGH";
     return "NORMAL";
   };
 

@@ -107,7 +107,7 @@ export default function PatientWorkflow({ labId, currentRole, userName = "Staff"
   // Results logging
   const [resultsModalOpen, setResultsModalOpen] = useState(false);
   const [resultsPatient, setResultsPatient] = useState<PatientEntry | null>(null);
-  const [resultsData, setResultsData] = useState<Record<string, number>>({});
+  const [resultsData, setResultsData] = useState<Record<string, number | string>>({});
 
   // Edit Patient Modal State
   const [editModalOpen, setEditModalOpen] = useState(false);
@@ -392,7 +392,7 @@ export default function PatientWorkflow({ labId, currentRole, userName = "Staff"
   // ── Results ──
   const handleOpenResults = (patient: PatientEntry) => {
     setResultsPatient(patient);
-    const init: Record<string, number> = {};
+    const init: Record<string, number | string> = {};
     patient.tests.forEach(t => t.parameters.forEach(p => {
       if (patient.results[p.id] !== undefined) init[p.id] = patient.results[p.id];
     }));
@@ -416,10 +416,12 @@ export default function PatientWorkflow({ labId, currentRole, userName = "Staff"
   };
 
   // ── Helpers ──
-  const getParamFlag = (v: number | undefined, min: number, max: number) => {
-    if (v === undefined || isNaN(v)) return "NORMAL";
-    if (v < min) return "LOW";
-    if (v > max) return "HIGH";
+  const getParamFlag = (v: any, min: number, max: number) => {
+    if (v === undefined || v === null || v === "") return "NORMAL";
+    const num = typeof v === "number" ? v : parseFloat(v);
+    if (isNaN(num)) return "NORMAL";
+    if (num < min) return "LOW";
+    if (num > max) return "HIGH";
     return "NORMAL";
   };
 
@@ -1356,14 +1358,19 @@ export default function PatientWorkflow({ labId, currentRole, userName = "Staff"
                             </div>
                             <div className="flex items-center gap-3">
                               <div className="relative">
-                                <input type="number" step="any" required placeholder="Value"
-                                  value={val === undefined ? "" : val}
-                                  onChange={e => setResultsData({ ...resultsData, [param.id]: parseFloat(e.target.value) })}
+                                <input type="text" required placeholder="Value"
+                                  value={val === undefined || val === null ? "" : val}
+                                  onChange={e => {
+                                    const rawVal = e.target.value;
+                                    const parsed = parseFloat(rawVal);
+                                    const isNumeric = !isNaN(parsed) && rawVal.trim() === parsed.toString();
+                                    setResultsData({ ...resultsData, [param.id]: isNumeric ? parsed : rawVal });
+                                  }}
                                   className="w-28 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-cyan-500/20 text-right pr-8"
                                 />
                                 <span className="absolute right-2.5 top-2 text-[9px] font-extrabold text-slate-400">{param.unit}</span>
                               </div>
-                              {val !== undefined && !isNaN(val) && (
+                              {val !== undefined && val !== "" && (
                                 <span className={`text-[8px] font-extrabold px-2.5 py-1 rounded-full uppercase tracking-wider ${
                                   flag !== "NORMAL" ? "bg-rose-50 text-rose-600 border border-rose-100/50 animate-pulse" : "bg-slate-100 text-slate-400"
                                 }`}>{flag}</span>

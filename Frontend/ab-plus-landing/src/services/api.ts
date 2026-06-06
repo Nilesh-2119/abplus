@@ -245,7 +245,7 @@ export interface PatientEntry {
   payment_status?: "FULLY_PAID" | "PARTIAL_PENDING" | "FULL_CONCESSION" | "CREDIT_PENDING";
   pending_balance?: number;
   tests: PathologyTest[];
-  results: Record<string, number>; // parameter.id -> entered value
+  results: Record<string, number | string>; // parameter.id -> entered value
   collected_by?: string;
   referred_doctor_id?: string;
   referred_doctor_name?: string;
@@ -3649,7 +3649,7 @@ export const apiService = {
   },
 
   // PATCH /patients/:id/results
-  async saveTestResults(patientId: string, results: Record<string, number>): Promise<PatientEntry> {
+  async saveTestResults(patientId: string, results: Record<string, number | string>): Promise<PatientEntry> {
     if (!IS_MOCK) {
       const res = await authFetch(`${API_URL}/patients/${patientId}/results/`, {
         method: "PATCH",
