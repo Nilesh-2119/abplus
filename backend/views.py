@@ -5,6 +5,7 @@ from rest_framework import viewsets, status, views
 from rest_framework.response import Response
 from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated, IsAdminUser, AllowAny
+from rest_framework.throttling import AnonRateThrottle  # SECURITY FIX (VULN-02): Login rate limiting
 from django.db.models import Count, Value, Sum
 from django.db.models.functions import Coalesce
 from django.shortcuts import get_object_or_404
@@ -186,10 +187,17 @@ class DashboardStatsView(views.APIView):
     Aggregates statistical highlights for Super Admin dashboard OR specific tenant dashboards.
     """
     def get(self, request):
-        lab_id = request.query_params.get('lab_id')
         from django.db.models import Q, F, OuterRef, Subquery, DecimalField, Value, Sum
         from django.db.models.functions import Coalesce
         import datetime
+
+        # SECURITY FIX (VULN-05): Enforce server-side lab scoping.
+        # Non-super-admin users can ONLY see their own lab's data,
+        # regardless of what lab_id they pass in the URL.
+        if request.user.is_authenticated and request.user.role != 'SUPER_ADMIN' and not request.user.is_superuser:
+            lab_id = str(request.user.lab_id) if request.user.lab_id else None
+        else:
+            lab_id = request.query_params.get('lab_id')
         
         # 1. Tenant-Specific Dashboard Stats
         if lab_id:
@@ -558,17 +566,21 @@ class EmployeeViewSet(SoftDeleteViewSetMixin, viewsets.ModelViewSet):
     @action(detail=True, methods=['post'], url_path='reset-password')
     def reset_password(self, request, pk=None):
         employee = self.get_object()
-        import random
-        temp_pass = f"AB-{random.randint(100000, 999999)}"
-        employee.set_password(temp_pass)
-        employee.raw_password = temp_pass
+        import random, string
+        # Generate a stronger temp password: AB- + 4 digits + 2 uppercase letters
+        rand_digits = ''.join(random.choices(string.digits, k=4))
+        rand_letters = ''.join(random.choices(string.ascii_uppercase, k=2))
+        temp_pass = f"AB-{rand_digits}{rand_letters}"
+        employee.set_password(temp_pass)  # SECURITY FIX (VULN-01c): Hash only, never store plaintext
         employee.requires_password_change = True
         employee.save()
 
-        # Log action
+        # Log action (VULN-09: use real operator identity)
+        operator = request.user
+        operator_email = operator.email or f"{operator.username}@local" if operator.is_authenticated else "system@local"
         ActivityLog.objects.create(
-            action=f"Reset password of {employee.first_name}",
-            user_email=request.data.get('operator_email', 'doctor@abplus.in'),
+            action=f"{operator.username} reset password of {employee.first_name} ({employee.username})",
+            user_email=operator_email,
             lab_name=employee.lab.name if employee.lab else 'Global'
         )
 
@@ -1231,8 +1243,10 @@ class ReferredDoctorViewSet(SoftDeleteViewSetMixin, viewsets.ModelViewSet):
 class LoginView(views.APIView):
     """
     API endpoint for employee and superadmin login authentication.
+    Rate-limited to prevent brute-force attacks (VULN-02).
     """
     permission_classes = [AllowAny]
+    throttle_classes = [AnonRateThrottle]  # SECURITY FIX (VULN-02): Max 10 login attempts/min per IP
 
     def post(self, request):
         lab_code = request.data.get('lab_code')
@@ -1279,10 +1293,10 @@ class LoginView(views.APIView):
         if authenticated_user.status != 'active':
             return Response({"error": "This account has been suspended."}, status=status.HTTP_403_FORBIDDEN)
         
-        # Log login action
+        # Log login action (VULN-09: use username as fallback identifier, not a fake email)
         ActivityLog.objects.create(
             action=f"User {authenticated_user.username} logged in successfully.",
-            user_email=authenticated_user.email or "noemail@abplus.in",
+            user_email=authenticated_user.email or f"{authenticated_user.username}@local",
             lab_name=authenticated_user.lab.name if authenticated_user.lab else 'Global'
         )
 
@@ -1326,18 +1340,19 @@ class ChangePasswordView(views.APIView):
 
     def post(self, request):
         new_password = request.data.get('new_password')
-        if not new_password or len(new_password) < 6:
-            return Response({"error": "Password must be at least 6 characters."}, status=status.HTTP_400_BAD_REQUEST)
+        # SECURITY FIX (VULN-08): Enforce minimum 8 chars for stronger passwords
+        if not new_password or len(new_password) < 8:
+            return Response({"error": "Password must be at least 8 characters."}, status=status.HTTP_400_BAD_REQUEST)
         
         user = request.user
-        user.set_password(new_password)
-        user.raw_password = new_password
+        user.set_password(new_password)  # SECURITY FIX (VULN-01c): Hash only, never store plaintext
         user.requires_password_change = False
         user.save()
 
+        # SECURITY FIX (VULN-09): Use username as fallback identifier, not a fake email
         ActivityLog.objects.create(
             action=f"User {user.username} changed their password.",
-            user_email=user.email or "noemail@abplus.in",
+            user_email=user.email or f"{user.username}@local",
             lab_name=user.lab.name if user.lab else 'Global'
         )
 

@@ -175,7 +175,7 @@ class CustomUser(AbstractUser, SoftDeleteModel):
     
     status = models.CharField(max_length=20, default='active', db_index=True)
     requires_password_change = models.BooleanField(default=False)
-    raw_password = models.CharField(max_length=255, blank=True, default='')
+    # raw_password field removed (SECURITY FIX VULN-01) — passwords stored only as PBKDF2 hash
     created_at = models.DateTimeField(auto_now_add=True, db_index=True)
  
     objects = CustomUserManager()
