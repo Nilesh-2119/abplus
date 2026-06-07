@@ -715,6 +715,7 @@ class LabSettingsSerializer(serializers.Serializer):
     phone = serializers.CharField(max_length=20)
     logo_base64 = serializers.CharField(allow_blank=True, required=False)
     letterhead_base64 = serializers.CharField(allow_blank=True, required=False)
+    pathologist_name = serializers.CharField(allow_blank=True, required=False)
 
     def update(self, instance, validated_data):
         lab = instance
@@ -725,10 +726,14 @@ class LabSettingsSerializer(serializers.Serializer):
 
         logo_base64 = validated_data.get('logo_base64', '')
         letterhead_base64 = validated_data.get('letterhead_base64', None)
+        pathologist_name = validated_data.get('pathologist_name', None)
+
         settings, created = LabSettings.objects.get_or_create(lab=lab)
         settings.logo_base64 = logo_base64
         if letterhead_base64 is not None:
             settings.letterhead_base64 = letterhead_base64
+        if pathologist_name is not None:
+            settings.pathologist_name = pathologist_name
         settings.save()
 
         return lab
@@ -738,9 +743,11 @@ class LabSettingsSerializer(serializers.Serializer):
         try:
             logo_base64 = lab.settings.logo_base64
             letterhead_base64 = lab.settings.letterhead_base64
+            pathologist_name = lab.settings.pathologist_name
         except LabSettings.DoesNotExist:
             logo_base64 = ""
             letterhead_base64 = ""
+            pathologist_name = "Dr. Rajesh Sharma, MD"
 
         return {
             'name': lab.name,
@@ -748,6 +755,7 @@ class LabSettingsSerializer(serializers.Serializer):
             'phone': lab.phone,
             'logo_base64': logo_base64 or "",
             'letterhead_base64': letterhead_base64 or "",
+            'pathologist_name': pathologist_name or "Dr. Rajesh Sharma, MD",
         }
 
 

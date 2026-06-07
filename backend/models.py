@@ -663,6 +663,7 @@ class LabSettings(models.Model):
         blank=True, null=True,
         help_text="Base64-encoded scanned letterhead image. Used as print background for each report page."
     )
+    pathologist_name = models.CharField(max_length=255, blank=True, default="Dr. Rajesh Sharma, MD")
 
     class Meta:
         verbose_name_plural = "Lab settings"

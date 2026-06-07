@@ -32,6 +32,7 @@ export default function LabSettings({ labId, labCode }: SettingsProps) {
   const [labPhone, setLabPhone] = useState("");
   const [logoBase64, setLogoBase64] = useState("");
   const [letterheadBase64, setLetterheadBase64] = useState("");
+  const [pathologistName, setPathologistName] = useState("Dr. ");
 
   const fetchSettings = async () => {
     setLoading(true);
@@ -42,6 +43,7 @@ export default function LabSettings({ labId, labCode }: SettingsProps) {
       setLabPhone(settings.phone);
       setLogoBase64(settings.logo_base64 || "");
       setLetterheadBase64(settings.letterhead_base64 || "");
+      setPathologistName(settings.pathologist_name || "Dr. ");
       setErrorMsg("");
     } catch (e) {
       console.error(e);
@@ -126,7 +128,8 @@ export default function LabSettings({ labId, labCode }: SettingsProps) {
         address: labAddress,
         phone: labPhone,
         logo_base64: logoBase64,
-        letterhead_base64: letterheadBase64
+        letterhead_base64: letterheadBase64,
+        pathologist_name: pathologistName
       });
       setSuccessMsg("Branding and letterhead configurations updated successfully.");
       
@@ -275,20 +278,45 @@ export default function LabSettings({ labId, labCode }: SettingsProps) {
 
         {/* Input Details */}
         <div className="space-y-4">
-          <div>
-            <label className="block text-[10px] font-extrabold text-slate-400 uppercase tracking-wide">
-              Official Laboratory Name
-            </label>
-            <div className="relative mt-1.5">
-              <Building2 size={14} className="absolute left-3.5 top-3 text-slate-400" />
-              <input
-                type="text"
-                required
-                placeholder="e.g. Apex Diagnostics & Research Centre"
-                value={labName}
-                onChange={(e) => setLabName(e.target.value)}
-                className="w-full pl-9 pr-4 py-2 rounded-xl border border-slate-200 text-xs font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-cyan-500/20"
-              />
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-[10px] font-extrabold text-slate-400 uppercase tracking-wide">
+                Official Laboratory Name
+              </label>
+              <div className="relative mt-1.5">
+                <Building2 size={14} className="absolute left-3.5 top-3 text-slate-400" />
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. Apex Diagnostics & Research Centre"
+                  value={labName}
+                  onChange={(e) => setLabName(e.target.value)}
+                  className="w-full pl-9 pr-4 py-2 rounded-xl border border-slate-200 text-xs font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-cyan-500/20"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-[10px] font-extrabold text-slate-400 uppercase tracking-wide">
+                Pathologist Name
+              </label>
+              <div className="relative mt-1.5">
+                <Building2 size={14} className="absolute left-3.5 top-3 text-slate-400" />
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. Dr. Rajesh Sharma, MD"
+                  value={pathologistName}
+                  onChange={(e) => setPathologistName(e.target.value)}
+                  onBlur={() => {
+                    const trimmed = pathologistName.trim();
+                    if (!trimmed.toLowerCase().startsWith("dr.")) {
+                      setPathologistName("Dr. " + trimmed.replace(/^(dr|dr\.)\s*/i, "").trim());
+                    }
+                  }}
+                  className="w-full pl-9 pr-4 py-2 rounded-xl border border-slate-200 text-xs font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-cyan-500/20"
+                />
+              </div>
             </div>
           </div>
 

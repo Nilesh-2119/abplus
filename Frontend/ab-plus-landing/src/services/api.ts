@@ -310,6 +310,7 @@ export interface LabSettings {
   phone: string;
   logo_base64?: string;
   letterhead_base64?: string;
+  pathologist_name?: string;
 }
 
 // Helper to simulate network latency
@@ -4196,7 +4197,8 @@ export const apiService = {
       address: "New Delhi, India",
       phone: "+91 99999 88888",
       logo_base64: "",
-      letterhead_base64: ""
+      letterhead_base64: "",
+      pathologist_name: "Dr. Rajesh Sharma, MD"
     };
   },
 
