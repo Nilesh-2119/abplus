@@ -42,6 +42,7 @@ interface CollectionBoyStats {
   settled_by_name?: string | null;
   net_cash_in_hand?: number;
   submitted_cash_today?: number;
+  online_collected_today?: number;
   total_pending_receivables?: number;
   total_pending_patients?: number;
 }
