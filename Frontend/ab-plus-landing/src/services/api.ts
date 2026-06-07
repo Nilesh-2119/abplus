@@ -130,9 +130,9 @@ export interface LabDashboardStats {
   cash_submitted_today?: number;
   previous_cash_pending?: number;
   cash_not_submitted_to_admin?: number;
-  // New Lab Admin vault metrics
   cash_available_in_vault?: number;
   received_from_cashier_today?: number;
+  online_payment_received?: number;
 }
 
 export interface ActivityLog {
@@ -255,6 +255,7 @@ export interface PatientEntry {
   created_at: string; // YYYY-MM-DD
   labId?: string;
   transactions?: PaymentTransaction[];
+  payment_mode?: "CASH" | "UPI";
 }
 
 export interface Expense {
@@ -2662,7 +2663,8 @@ export const apiService = {
           cash_in_vault: Number(data.cash_in_vault),
           cash_submitted_today: Number(data.cash_submitted_today),
           previous_cash_pending: Number(data.previous_cash_pending),
-          cash_not_submitted_to_admin: Number(data.cash_not_submitted_to_admin)
+          cash_not_submitted_to_admin: Number(data.cash_not_submitted_to_admin),
+          online_payment_received: data.online_payment_received !== undefined ? Number(data.online_payment_received) : undefined
         };
       }
       return {
@@ -2677,6 +2679,7 @@ export const apiService = {
         lab_cash_collection_pending: data.lab_cash_collection_pending !== undefined ? Number(data.lab_cash_collection_pending) : undefined,
         cash_available_in_vault: data.cash_available_in_vault !== undefined ? Number(data.cash_available_in_vault) : undefined,
         received_from_cashier_today: data.received_from_cashier_today !== undefined ? Number(data.received_from_cashier_today) : undefined,
+        online_payment_received: data.online_payment_received !== undefined ? Number(data.online_payment_received) : undefined,
       };
     }
     await delay(300);
@@ -2729,7 +2732,8 @@ export const apiService = {
       const directDeskCash = state.patients.filter(p => 
         p.labId === labId && 
         p.created_at === date && 
-        !p.collected_by
+        !p.collected_by &&
+        p.payment_mode !== "UPI"
       ).reduce((sum, p) => sum + p.paid_amount, 0);
 
       // Daily expenses for today
@@ -2738,6 +2742,18 @@ export const apiService = {
 
       const gross_cash = directDeskCash + net_cash_received;
       const cashier_pending = Math.max(0, gross_cash - daily_expenses - total_submitted_today);
+
+      let mock_online_received = 0;
+      for (const p of state.patients) {
+        if (p.labId === labId) {
+          for (const t of p.transactions || []) {
+            const tDate = t.payment_date ? t.payment_date.split("T")[0] : "";
+            if (tDate === date && t.payment_mode === "UPI") {
+              mock_online_received += t.amount_received;
+            }
+          }
+        }
+      }
 
       return {
         today_patients: 0,
@@ -2756,7 +2772,8 @@ export const apiService = {
         cash_in_vault: cashier_pending,
         cash_submitted_today: total_submitted_today,
         previous_cash_pending: 0,
-        cash_not_submitted_to_admin: cashier_pending
+        cash_not_submitted_to_admin: cashier_pending,
+        online_payment_received: mock_online_received
       };
     }
 
@@ -2841,6 +2858,18 @@ export const apiService = {
     }
     const lab_cash_collection_pending = bcb_pending + cashier_pending;
 
+    let mock_online_received = 0;
+    for (const p of state.patients) {
+      if (p.labId === labId) {
+        for (const t of p.transactions || []) {
+          const tDate = t.payment_date ? t.payment_date.split("T")[0] : "";
+          if (tDate === date && t.payment_mode === "UPI") {
+            mock_online_received += t.amount_received;
+          }
+        }
+      }
+    }
+
     return {
       today_patients,
       pending_reports,
@@ -2849,7 +2878,8 @@ export const apiService = {
       pending_balance,
       daily_expenses,
       net_revenue,
-      lab_cash_collection_pending
+      lab_cash_collection_pending,
+      online_payment_received: mock_online_received
     };
   },
 
@@ -3837,6 +3867,7 @@ export const apiService = {
     settled_patients: number;
     pending_patients: number;
     total_collected: number;
+    online_collected_today?: number;
     pending_amount: number;
     concession_totals: number;
     total_expenses: number;
@@ -3860,6 +3891,7 @@ export const apiService = {
         settled_patients: Number(data.settled_patients),
         pending_patients: Number(data.pending_patients),
         total_collected: Number(data.total_collected),
+        online_collected_today: Number(data.online_collected_today ?? 0),
         pending_amount: Number(data.pending_amount),
         concession_totals: Number(data.concession_totals),
         total_expenses: Number(data.total_expenses),
@@ -3891,7 +3923,8 @@ export const apiService = {
     const total_patients = labPatients.length;
     const settled_patients = labPatients.filter(p => p.total_bill - p.paid_amount - (p.concession || 0) <= 0).length;
     const pending_patients = labPatients.filter(p => p.total_bill - p.paid_amount - (p.concession || 0) > 0).length;
-    const total_collected = labPatients.reduce((sum, p) => sum + p.paid_amount, 0);
+    const total_collected = labPatients.filter(p => p.payment_mode !== "UPI").reduce((sum, p) => sum + p.paid_amount, 0);
+    const online_collected_today = labPatients.filter(p => p.payment_mode === "UPI").reduce((sum, p) => sum + p.paid_amount, 0);
     const pending_amount = labPatients.reduce((sum, p) => sum + Math.max(0, p.total_bill - p.paid_amount - (p.concession || 0)), 0);
     const concession_totals = labPatients.reduce((sum, p) => sum + (p.concession || 0), 0);
     const total_expenses = labExpenses.reduce((sum, e) => sum + e.amount, 0);
@@ -3922,6 +3955,7 @@ export const apiService = {
       settled_patients,
       pending_patients,
       total_collected,
+      online_collected_today,
       pending_amount,
       concession_totals,
       total_expenses,

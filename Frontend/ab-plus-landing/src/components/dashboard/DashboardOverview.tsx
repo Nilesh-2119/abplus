@@ -15,6 +15,7 @@ import {
   ArrowDownToLine,
   RefreshCw,
   Wallet,
+  QrCode,
 } from "lucide-react";
 import { motion } from "framer-motion";
 
@@ -74,7 +75,7 @@ export default function DashboardOverview({ labId, currentRole, labCode }: Overv
 
   const totalExpensesToday = expenses.reduce((sum, e) => sum + e.amount, 0);
 
-  // Top stat cards (first row — 4 cards)
+  // Top stat cards (first row — 5 cards)
   const topCards = [
     {
       id: "today_patients",
@@ -114,6 +115,16 @@ export default function DashboardOverview({ labId, currentRole, labCode }: Overv
       desc: "Total lab expenses for this date",
       gradient: "from-rose-500 to-red-600",
       iconCls: "text-rose-600 bg-rose-50",
+      isCurrency: true,
+    },
+    {
+      id: "online_payment",
+      title: "Online Payment",
+      value: stats?.online_payment_received ?? 0,
+      icon: QrCode,
+      desc: "Online/UPI payments received on this date",
+      gradient: "from-violet-500 to-indigo-500",
+      iconCls: "text-violet-600 bg-violet-50",
       isCurrency: true,
     },
   ];
@@ -161,8 +172,8 @@ export default function DashboardOverview({ labId, currentRole, labCode }: Overv
         </div>
       </div>
 
-      {/* ── Top 4 Stats Cards ── */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      {/* ── Top 5 Stats Cards ── */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
         {topCards.map((card, idx) => {
           const Icon = card.icon;
           return (

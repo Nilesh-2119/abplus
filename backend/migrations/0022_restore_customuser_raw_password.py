@@ -8,9 +8,4 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
-        migrations.AddField(
-            model_name='customuser',
-            name='raw_password',
-            field=models.CharField(blank=True, default='', max_length=255),
-        ),
     ]

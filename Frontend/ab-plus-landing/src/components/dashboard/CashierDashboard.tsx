@@ -17,7 +17,8 @@ import {
   Plus,
   Trash2,
   TrendingDown,
-  UserCheck
+  UserCheck,
+  QrCode
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -41,6 +42,7 @@ interface CollectionBoyStats {
   settled_by_name?: string | null;
   net_cash_in_hand?: number;
   submitted_cash_today?: number;
+  online_collected_today?: number;
   total_pending_receivables?: number;
   total_pending_patients?: number;
 }
@@ -354,7 +356,7 @@ export default function CashierDashboard({ labId, currentRole, userName = "Cashi
       )}
 
       {/* ── Top Dashboard Section ── */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
         {/* Metric 1: Cash In Vault */}
         <div className="bg-white border border-slate-200/60 rounded-2xl p-5 shadow-sm relative overflow-hidden group">
           <div className="absolute top-0 right-0 h-24 w-24 bg-gradient-to-br from-cyan-500 to-blue-500 opacity-0 group-hover:opacity-[0.03] rounded-full blur-xl transition-all duration-500" />
@@ -373,6 +375,27 @@ export default function CashierDashboard({ labId, currentRole, userName = "Cashi
           </div>
           <p className="text-[10px] text-slate-400 font-semibold mt-3">
             Physical cash in Cashier vault
+          </p>
+        </div>
+
+        {/* Metric 1.5: Online Payment Received */}
+        <div className="bg-white border border-slate-200/60 rounded-2xl p-5 shadow-sm relative overflow-hidden group">
+          <div className="absolute top-0 right-0 h-24 w-24 bg-gradient-to-br from-violet-500 to-indigo-500 opacity-0 group-hover:opacity-[0.03] rounded-full blur-xl transition-all duration-500" />
+          <div className="flex items-start justify-between">
+            <div>
+              <span className="text-[9px] font-extrabold text-slate-400 uppercase tracking-wider">
+                Online Payment Received
+              </span>
+              <h3 className="text-2xl font-black text-violet-600 mt-1">
+                {formatCurrency(stats?.online_payment_received || 0)}
+              </h3>
+            </div>
+            <div className="rounded-xl p-2.5 bg-violet-50 text-violet-600 shadow-inner">
+              <QrCode size={18} />
+            </div>
+          </div>
+          <p className="text-[10px] text-slate-400 font-semibold mt-3">
+            Online/UPI payments received today
           </p>
         </div>
 
@@ -460,6 +483,7 @@ export default function CashierDashboard({ labId, currentRole, userName = "Cashi
                 <th className="px-5 py-3 text-[10px] font-extrabold text-slate-400 uppercase tracking-wider">Collection Boy</th>
                 <th className="px-5 py-3 text-[10px] font-extrabold text-slate-400 uppercase tracking-wider text-right">Cash In Hand</th>
                 <th className="px-5 py-3 text-[10px] font-extrabold text-slate-400 uppercase tracking-wider text-right">Cash Received Today</th>
+                <th className="px-5 py-3 text-[10px] font-extrabold text-slate-400 uppercase tracking-wider text-right text-violet-500">Online Received</th>
                 <th className="px-5 py-3 text-[10px] font-extrabold text-slate-400 uppercase tracking-wider text-right">Patients Bill Pending</th>
                 <th className="px-5 py-3 text-[10px] font-extrabold text-slate-400 uppercase tracking-wider text-center">Action</th>
               </tr>
@@ -467,7 +491,7 @@ export default function CashierDashboard({ labId, currentRole, userName = "Cashi
             <tbody className="divide-y divide-slate-100 text-xs">
               {loading && collectionBoys.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="px-5 py-12 text-center text-slate-400 font-semibold">
+                  <td colSpan={6} className="px-5 py-12 text-center text-slate-400 font-semibold">
                     <div className="flex justify-center items-center gap-2">
                       <div className="h-4 w-4 animate-spin rounded-full border-2 border-cyan-500 border-t-transparent" />
                       Loading collection boy details...
@@ -476,7 +500,7 @@ export default function CashierDashboard({ labId, currentRole, userName = "Cashi
                 </tr>
               ) : collectionBoys.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="px-5 py-12 text-center text-slate-400 font-semibold">
+                  <td colSpan={6} className="px-5 py-12 text-center text-slate-400 font-semibold">
                     No active collection boys found.
                   </td>
                 </tr>
@@ -485,6 +509,7 @@ export default function CashierDashboard({ labId, currentRole, userName = "Cashi
                   const isSettled = row.stats?.settlement_status === "SETTLED";
                   const netCashWaiting = row.stats?.net_cash_in_hand ?? 0;
                   const submittedCashToday = row.stats?.submitted_cash_today ?? 0;
+                  const onlineReceived = row.stats?.online_collected_today ?? 0;
                   const pendingReceivables = row.stats?.total_pending_receivables ?? 0;
                   
                   return (
@@ -505,6 +530,9 @@ export default function CashierDashboard({ labId, currentRole, userName = "Cashi
                       </td>
                       <td className="px-5 py-4 text-right font-semibold text-emerald-600">
                         {row.loading ? "—" : formatCurrency(submittedCashToday)}
+                      </td>
+                      <td className="px-5 py-4 text-right font-semibold text-violet-600">
+                        {row.loading ? "—" : formatCurrency(onlineReceived)}
                       </td>
                       <td className="px-5 py-4 text-right font-semibold text-amber-600">
                         {row.loading ? "—" : formatCurrency(pendingReceivables)}
@@ -791,6 +819,10 @@ export default function CashierDashboard({ labId, currentRole, userName = "Cashi
                 <div className="flex justify-between items-center text-xs text-slate-600">
                   <span>Logged Expenses:</span>
                   <span className="font-bold text-rose-500">-{formatCurrency(settleBoy.stats.total_expenses)}</span>
+                </div>
+                <div className="flex justify-between items-center text-xs text-slate-600">
+                  <span>UPI Payments (Info Only):</span>
+                  <span className="font-bold text-violet-600">{formatCurrency(settleBoy.stats.online_collected_today ?? 0)}</span>
                 </div>
                 <div className="flex justify-between items-center text-xs text-slate-600">
                   <span>Rebates/Concessions (Info Only):</span>
