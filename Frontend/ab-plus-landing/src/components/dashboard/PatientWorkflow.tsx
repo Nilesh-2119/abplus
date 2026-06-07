@@ -1367,15 +1367,7 @@ export default function PatientWorkflow({ labId, currentRole, userName = "Staff"
                       <button
                         key={mode}
                         type="button"
-                        onClick={() => {
-                          setPatPaymentMode(mode as any);
-                          if (mode === "UPI") {
-                            const totalBill = selectedTests.reduce((s, t) => s + Number(t.price), 0);
-                            setPaidAmount(totalBill.toString());
-                          } else {
-                            setPaidAmount("");
-                          }
-                        }}
+                        onClick={() => setPatPaymentMode(mode as any)}
                         className={`flex-1 py-2 text-xs font-bold rounded-xl border transition-all cursor-pointer ${
                           patPaymentMode === mode
                             ? "bg-cyan-50 border-cyan-500 text-cyan-600 shadow-sm"
