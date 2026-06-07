@@ -170,3 +170,7 @@ for host in ALLOWED_HOSTS:
 
 # Silence Django USERNAME_FIELD global uniqueness requirement check
 SILENCED_SYSTEM_CHECKS = ["auth.E003"]
+
+# Configure maximum request and file upload size (e.g. 20MB) to allow high-resolution letterhead uploads
+DATA_UPLOAD_MAX_MEMORY_SIZE = 20971520  # 20MB
+FILE_UPLOAD_MAX_MEMORY_SIZE = 20971520  # 20MB
