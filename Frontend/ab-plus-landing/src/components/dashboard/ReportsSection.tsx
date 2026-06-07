@@ -340,28 +340,28 @@ export default function ReportsSection({ labId, currentRole }: ReportsProps) {
             </tbody>
           </table>
 
-          {/* End of Report & Signature (Only on last test page) */}
-          {page.testIndex === activePatient.tests.length - 1 && (
-            <div className="mt-8 space-y-6">
+          {/* End of Report & Signature (Only on last test page, signatures on all pages) */}
+          <div className="mt-8 space-y-6">
+            {page.testIndex === activePatient.tests.length - 1 && (
               <div className="text-center text-[10px] font-black text-slate-500 tracking-widest">
                 ***End of Report***
               </div>
-              <div className="flex justify-between items-end gap-6 pt-4 border-t border-slate-200">
-                <div className="text-[10px] font-bold text-slate-400 space-y-1">
-                  <span className="block font-mono font-black text-slate-800 text-[10px]">BARCODE STAMP</span>
-                  <span className="block">Diagnostic System Validation</span>
-                  <span className="block font-mono text-slate-300">{activePatient.id}</span>
+            )}
+            <div className="flex justify-between items-end gap-6 pt-4 border-t border-slate-200">
+              <div className="text-[10px] font-bold text-slate-400 space-y-1">
+                <span className="block font-mono font-black text-slate-800 text-[10px]">BARCODE STAMP</span>
+                <span className="block">Diagnostic System Validation</span>
+                <span className="block font-mono text-slate-300">{activePatient.id}</span>
+              </div>
+              <div className="text-right space-y-1">
+                <div className="h-8 w-28 bg-slate-50 border border-dashed border-slate-200 flex items-center justify-center rounded-lg text-[9px] text-slate-300 font-extrabold uppercase italic ml-auto select-none">
+                  Signature
                 </div>
-                <div className="text-right space-y-1">
-                  <div className="h-8 w-28 bg-slate-50 border border-dashed border-slate-200 flex items-center justify-center rounded-lg text-[9px] text-slate-300 font-extrabold uppercase italic ml-auto select-none">
-                    Signature
-                  </div>
-                  <span className="block text-[11px] text-slate-800 font-black">Dr. Rajesh Sharma, MD</span>
-                  <span className="block text-[9px] text-slate-400 font-semibold">Pathologist & Lab Director</span>
-                </div>
+                <span className="block text-[11px] text-slate-800 font-black">Dr. Rajesh Sharma, MD</span>
+                <span className="block text-[9px] text-slate-400 font-semibold">Pathologist & Lab Director</span>
               </div>
             </div>
-          )}
+          </div>
         </div>
       );
     }
@@ -771,28 +771,28 @@ export default function ReportsSection({ labId, currentRole }: ReportsProps) {
                                   </tbody>
                                 </table>
 
-                                {/* End of Report & Signature (Only on last test page) */}
-                                {page.testIndex === activePatient.tests.length - 1 && (
-                                  <div className="mt-8 space-y-6">
+                                {/* End of Report & Signature (Only on last test page, signatures on all pages) */}
+                                <div className="mt-8 space-y-6">
+                                  {page.testIndex === activePatient.tests.length - 1 && (
                                     <div className="text-center text-[10px] font-black text-slate-500 tracking-widest">
                                       ***End of Report***
                                     </div>
-                                    <div className="flex justify-between items-end gap-6 pt-4 border-t border-slate-200">
-                                      <div className="text-[10px] font-bold text-slate-400 space-y-1">
-                                        <span className="block font-mono font-black text-slate-800 text-[10px]">BARCODE STAMP</span>
-                                        <span className="block">Diagnostic System Validation</span>
-                                        <span className="block font-mono text-slate-300">{activePatient.id}</span>
+                                  )}
+                                  <div className="flex justify-between items-end gap-6 pt-4 border-t border-slate-200">
+                                    <div className="text-[10px] font-bold text-slate-400 space-y-1">
+                                      <span className="block font-mono font-black text-slate-800 text-[10px]">BARCODE STAMP</span>
+                                      <span className="block">Diagnostic System Validation</span>
+                                      <span className="block font-mono text-slate-300">{activePatient.id}</span>
+                                    </div>
+                                    <div className="text-right space-y-1">
+                                      <div className="h-8 w-28 bg-slate-50 border border-dashed border-slate-200 flex items-center justify-center rounded-lg text-[9px] text-slate-300 font-extrabold uppercase italic ml-auto select-none">
+                                        Signature
                                       </div>
-                                      <div className="text-right space-y-1">
-                                        <div className="h-8 w-28 bg-slate-50 border border-dashed border-slate-200 flex items-center justify-center rounded-lg text-[9px] text-slate-300 font-extrabold uppercase italic ml-auto select-none">
-                                          Signature
-                                        </div>
-                                        <span className="block text-[11px] text-slate-800 font-black">Dr. Rajesh Sharma, MD</span>
-                                        <span className="block text-[9px] text-slate-400 font-semibold">Pathologist & Lab Director</span>
-                                      </div>
+                                      <span className="block text-[11px] text-slate-800 font-black">Dr. Rajesh Sharma, MD</span>
+                                      <span className="block text-[9px] text-slate-400 font-semibold">Pathologist & Lab Director</span>
                                     </div>
                                   </div>
-                                )}
+                                </div>
                               </div>
                             );
                           })()}
