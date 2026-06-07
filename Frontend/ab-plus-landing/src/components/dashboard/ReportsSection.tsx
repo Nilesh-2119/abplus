@@ -272,43 +272,59 @@ export default function ReportsSection({ labId, currentRole }: ReportsProps) {
           {/* Results Table */}
           <table className="w-full text-left border-collapse text-[11px] font-semibold">
             <thead>
-              <tr className="bg-slate-50 border border-slate-100 text-slate-400 font-extrabold uppercase rounded-xl">
-                <th className="py-2.5 px-3 rounded-l-xl w-2/5">Investigation Name</th>
-                <th className="py-2.5 px-3 text-center w-1/5">Observed Value</th>
-                <th className="py-2.5 px-3 text-center w-1/5">Reference Range</th>
-                <th className="py-2.5 px-3 text-center w-1/5 rounded-r-xl">Unit</th>
+              <tr className="text-slate-800 font-bold uppercase">
+                <th className="py-2.5 px-3 w-[40%] text-left">
+                  <span className="border-b border-slate-900 pb-0.5 font-bold uppercase tracking-wider text-slate-800">TESTS</span>
+                </th>
+                <th className="py-2.5 px-3 w-[25%] text-left">
+                  <span className="border-b border-slate-900 pb-0.5 font-bold uppercase tracking-wider text-slate-800">RESULTS</span>
+                </th>
+                <th className="py-2.5 px-3 w-[15%] text-left">
+                  <span className="border-b border-slate-900 pb-0.5 font-bold uppercase tracking-wider text-slate-800">UNIT</span>
+                </th>
+                <th className="py-2.5 px-3 w-[20%] text-left">
+                  <span className="border-b border-slate-900 pb-0.5 font-bold uppercase tracking-wider text-slate-800">REFERENCE RANGE</span>
+                </th>
               </tr>
             </thead>
-            <tbody>
+            <tbody className="divide-y divide-transparent">
               {test.parameters.map((param, pIdx) => {
                 const val = activePatient.results[param.id];
                 const flag = getParamFlag(val, param.min_val, param.max_val);
                 const isLow = flag === "LOW";
                 const isHigh = flag === "HIGH";
                 const isAbnormal = isLow || isHigh;
+                const isHeader = (!param.unit && !param.min_val && !param.max_val) && (val === undefined || val === null || val === "");
+
+                if (isHeader) {
+                  return (
+                    <tr key={param.id} className="text-slate-800">
+                      <td colSpan={4} className="py-2.5 px-3">
+                        <span className="font-bold text-[12px] uppercase underline decoration-2 underline-offset-4 tracking-wide text-slate-900">
+                          {param.name}
+                        </span>
+                      </td>
+                    </tr>
+                  );
+                }
+
+                const hasRange = param.min_val !== undefined && param.max_val !== undefined && (param.min_val !== 0 || param.max_val !== 0);
+                const rangeStr = hasRange ? `${param.min_val} – ${param.max_val}` : "";
+
                 return (
-                  <tr
-                    key={param.id}
-                    className={`border-b text-slate-700 transition-colors ${
-                      pIdx % 2 === 0 ? "bg-white" : "bg-slate-50/40"
-                    } ${isAbnormal ? "border-rose-100" : "border-slate-100"}`}
-                  >
-                    <td className="py-3 px-3 font-bold text-slate-800">{param.name}</td>
-                    <td className="py-3 px-3 text-center">
-                      <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg font-black text-[11px] ${
-                        isAbnormal
-                          ? "text-rose-600 bg-rose-50 border border-rose-200"
-                          : "text-emerald-700 bg-emerald-50 border border-emerald-100"
-                      }`}>
-                        {val !== undefined ? val : "—"}
-                        {isLow && <span className="text-[9px] font-black">↓</span>}
-                        {isHigh && <span className="text-[9px] font-black">↑</span>}
+                  <tr key={param.id} className="text-slate-800 hover:bg-slate-50/50 transition-colors">
+                    <td className="py-2 px-3 font-semibold text-slate-700">{param.name}</td>
+                    <td className="py-2 px-3 text-left">
+                      <span className={isAbnormal ? "text-rose-600 font-black text-[11px]" : "text-slate-900 font-bold text-[11px]"}>
+                        : {val !== undefined ? val : "—"}
+                        {isLow && <span className="text-[9px] font-black ml-1">↓</span>}
+                        {isHigh && <span className="text-[9px] font-black ml-1">↑</span>}
                       </span>
                     </td>
-                    <td className="py-3 px-3 text-center text-slate-500 font-mono">
-                      {param.min_val} – {param.max_val}
+                    <td className="py-2 px-3 text-left text-slate-600">{param.unit || ""}</td>
+                    <td className="py-2 px-3 text-left text-slate-500 font-mono">
+                      {rangeStr}
                     </td>
-                    <td className="py-3 px-3 text-center text-slate-400">{param.unit}</td>
                   </tr>
                 );
               })}
@@ -675,39 +691,59 @@ export default function ReportsSection({ labId, currentRole }: ReportsProps) {
 
                                 <table className="w-full text-left border-collapse text-[11px] font-semibold">
                                   <thead>
-                                    <tr className="bg-slate-50 border border-slate-100 text-slate-400 font-extrabold uppercase">
-                                      <th className="py-2 px-3 w-2/5">Investigation Name</th>
-                                      <th className="py-2 px-3 text-center w-1/5">Observed Value</th>
-                                      <th className="py-2 px-3 text-center w-1/5">Reference Range</th>
-                                      <th className="py-2 px-3 text-center w-1/5">Unit</th>
+                                    <tr className="text-slate-800 font-bold uppercase">
+                                      <th className="py-2 px-3 w-[40%] text-left">
+                                        <span className="border-b border-slate-900 pb-0.5 font-bold uppercase tracking-wider text-slate-800">TESTS</span>
+                                      </th>
+                                      <th className="py-2 px-3 w-[25%] text-left">
+                                        <span className="border-b border-slate-900 pb-0.5 font-bold uppercase tracking-wider text-slate-800">RESULTS</span>
+                                      </th>
+                                      <th className="py-2 px-3 w-[15%] text-left">
+                                        <span className="border-b border-slate-900 pb-0.5 font-bold uppercase tracking-wider text-slate-800">UNIT</span>
+                                      </th>
+                                      <th className="py-2 px-3 w-[20%] text-left">
+                                        <span className="border-b border-slate-900 pb-0.5 font-bold uppercase tracking-wider text-slate-800">REFERENCE RANGE</span>
+                                      </th>
                                     </tr>
                                   </thead>
-                                  <tbody>
+                                  <tbody className="divide-y divide-transparent">
                                     {test.parameters.map((param, pIdx) => {
                                       const val = activePatient.results[param.id];
                                       const flag = getParamFlag(val, param.min_val, param.max_val);
                                       const isLow = flag === "LOW";
                                       const isHigh = flag === "HIGH";
                                       const isAbnormal = isLow || isHigh;
+                                      const isHeader = (!param.unit && !param.min_val && !param.max_val) && (val === undefined || val === null || val === "");
+
+                                      if (isHeader) {
+                                        return (
+                                          <tr key={param.id} className="text-slate-800">
+                                            <td colSpan={4} className="py-2.5 px-3">
+                                              <span className="font-bold text-[12px] uppercase underline decoration-2 underline-offset-4 tracking-wide text-slate-900">
+                                                {param.name}
+                                              </span>
+                                            </td>
+                                          </tr>
+                                        );
+                                      }
+
+                                      const hasRange = param.min_val !== undefined && param.max_val !== undefined && (param.min_val !== 0 || param.max_val !== 0);
+                                      const rangeStr = hasRange ? `${param.min_val} – ${param.max_val}` : "";
+
                                       return (
-                                        <tr
-                                          key={param.id}
-                                          className={`border-b text-slate-700 ${
-                                            pIdx % 2 === 0 ? "bg-white" : "bg-slate-50/20"
-                                          } ${isAbnormal ? "border-rose-100 bg-rose-50/10" : "border-slate-100"}`}
-                                        >
-                                          <td className="py-2.5 px-3 font-bold text-slate-800">{param.name}</td>
-                                          <td className="py-2.5 px-3 text-center">
-                                            <span className={`inline-flex items-center gap-0.5 px-2 py-0.5 rounded font-black text-[11px] ${
-                                              isAbnormal ? "text-rose-600 bg-rose-50 border border-rose-100" : "text-slate-800"
-                                            }`}>
-                                              {val !== undefined ? val : "Awaiting Lab"}
+                                        <tr key={param.id} className="text-slate-800">
+                                          <td className="py-2 px-3 font-semibold text-slate-700">{param.name}</td>
+                                          <td className="py-2 px-3 text-left">
+                                            <span className={isAbnormal ? "text-rose-600 font-black text-[11px]" : "text-slate-900 font-bold text-[11px]"}>
+                                              : {val !== undefined ? val : "—"}
+                                              {isLow && <span className="text-[9px] font-black ml-1">↓</span>}
+                                              {isHigh && <span className="text-[9px] font-black ml-1">↑</span>}
                                             </span>
                                           </td>
-                                          <td className="py-2.5 px-3 text-center text-slate-500 font-mono">
-                                            {param.min_val} – {param.max_val}
+                                          <td className="py-2 px-3 text-left text-slate-600">{param.unit || ""}</td>
+                                          <td className="py-2 px-3 text-left text-slate-500 font-mono">
+                                            {rangeStr}
                                           </td>
-                                          <td className="py-2.5 px-3 text-center text-slate-400">{param.unit}</td>
                                         </tr>
                                       );
                                     })}
