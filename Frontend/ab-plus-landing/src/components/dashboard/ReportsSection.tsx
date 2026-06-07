@@ -106,7 +106,7 @@ export default function ReportsSection({ labId, currentRole }: ReportsProps) {
     return "NORMAL";
   };
 
-  // Build "pages": pages 0..N-1 = one test each, last page = footer
+  // Build "pages": pages 0..N-1 = one test each
   const buildPages = (patient: PatientEntry) => {
     type Page =
       | { type: "cover" }
@@ -114,7 +114,6 @@ export default function ReportsSection({ labId, currentRole }: ReportsProps) {
       | { type: "footer" };
     const pages: Page[] = [];
     patient.tests.forEach((_, idx) => pages.push({ type: "test", testIndex: idx }));
-    pages.push({ type: "footer" });
     return pages;
   };
 
@@ -321,16 +320,18 @@ export default function ReportsSection({ labId, currentRole }: ReportsProps) {
 
                 return (
                   <tr key={param.id} className="text-slate-800 hover:bg-slate-50/50 transition-colors">
-                    <td className="py-2 px-3 font-semibold text-slate-700">{param.name}</td>
+                    <td className={`py-2 px-3 ${isAbnormal ? "font-bold text-slate-900" : "font-normal text-slate-700"}`}>
+                      {param.name}
+                    </td>
                     <td className="py-2 px-3 text-left">
-                      <span className={isAbnormal ? "text-rose-600 font-black text-[11px]" : "text-slate-900 font-bold text-[11px]"}>
+                      <span className={isAbnormal ? "text-slate-900 font-bold text-[11px]" : "text-slate-700 font-normal text-[11px]"}>
                         : {val !== undefined ? val : "—"}
                         {isLow && <span className="text-[9px] font-black ml-1">↓</span>}
                         {isHigh && <span className="text-[9px] font-black ml-1">↑</span>}
                       </span>
                     </td>
-                    <td className="py-2 px-3 text-left text-slate-600">{param.unit || ""}</td>
-                    <td className="py-2 px-3 text-left text-slate-500 font-mono">
+                    <td className="py-2 px-3 text-left text-slate-600 font-normal">{param.unit || ""}</td>
+                    <td className="py-2 px-3 text-left text-slate-500 font-normal font-mono">
                       {rangeStr}
                     </td>
                   </tr>
@@ -339,16 +340,26 @@ export default function ReportsSection({ labId, currentRole }: ReportsProps) {
             </tbody>
           </table>
 
-          {/* Abnormal note if any */}
-          {test.parameters.some((p) => {
-            const v = activePatient.results[p.id];
-            return getParamFlag(v, p.min_val, p.max_val) !== "NORMAL" && getParamFlag(v, p.min_val, p.max_val) !== "";
-          }) && (
-            <div className="flex items-start gap-2 p-2.5 bg-rose-50/60 border border-rose-100 rounded-xl">
-              <AlertCircle size={12} className="text-rose-400 mt-0.5 shrink-0" />
-              <p className="text-[11px] text-rose-600 font-semibold">
-                One or more values are outside the reference range. Please consult your physician.
-              </p>
+          {/* End of Report & Signature (Only on last test page) */}
+          {page.testIndex === activePatient.tests.length - 1 && (
+            <div className="mt-8 space-y-6">
+              <div className="text-center text-[10px] font-black text-slate-500 tracking-widest">
+                ***End of Report***
+              </div>
+              <div className="flex justify-between items-end gap-6 pt-4 border-t border-slate-200">
+                <div className="text-[10px] font-bold text-slate-400 space-y-1">
+                  <span className="block font-mono font-black text-slate-800 text-[10px]">BARCODE STAMP</span>
+                  <span className="block">Diagnostic System Validation</span>
+                  <span className="block font-mono text-slate-300">{activePatient.id}</span>
+                </div>
+                <div className="text-right space-y-1">
+                  <div className="h-8 w-28 bg-slate-50 border border-dashed border-slate-200 flex items-center justify-center rounded-lg text-[9px] text-slate-300 font-extrabold uppercase italic ml-auto select-none">
+                    Signature
+                  </div>
+                  <span className="block text-[11px] text-slate-800 font-black">Dr. Rajesh Sharma, MD</span>
+                  <span className="block text-[9px] text-slate-400 font-semibold">Pathologist & Lab Director</span>
+                </div>
+              </div>
             </div>
           )}
         </div>
@@ -740,16 +751,18 @@ export default function ReportsSection({ labId, currentRole }: ReportsProps) {
 
                                       return (
                                         <tr key={param.id} className="text-slate-800">
-                                          <td className="py-2 px-3 font-semibold text-slate-700">{param.name}</td>
+                                          <td className={`py-2 px-3 ${isAbnormal ? "font-bold text-slate-900" : "font-normal text-slate-700"}`}>
+                                            {param.name}
+                                          </td>
                                           <td className="py-2 px-3 text-left">
-                                            <span className={isAbnormal ? "text-rose-600 font-black text-[11px]" : "text-slate-900 font-bold text-[11px]"}>
+                                            <span className={isAbnormal ? "text-slate-900 font-bold text-[11px]" : "text-slate-700 font-normal text-[11px]"}>
                                               : {val !== undefined ? val : "—"}
                                               {isLow && <span className="text-[9px] font-black ml-1">↓</span>}
                                               {isHigh && <span className="text-[9px] font-black ml-1">↑</span>}
                                             </span>
                                           </td>
-                                          <td className="py-2 px-3 text-left text-slate-600">{param.unit || ""}</td>
-                                          <td className="py-2 px-3 text-left text-slate-500 font-mono">
+                                          <td className="py-2 px-3 text-left text-slate-600 font-normal">{param.unit || ""}</td>
+                                          <td className="py-2 px-3 text-left text-slate-500 font-normal font-mono">
                                             {rangeStr}
                                           </td>
                                         </tr>
@@ -757,6 +770,29 @@ export default function ReportsSection({ labId, currentRole }: ReportsProps) {
                                     })}
                                   </tbody>
                                 </table>
+
+                                {/* End of Report & Signature (Only on last test page) */}
+                                {page.testIndex === activePatient.tests.length - 1 && (
+                                  <div className="mt-8 space-y-6">
+                                    <div className="text-center text-[10px] font-black text-slate-500 tracking-widest">
+                                      ***End of Report***
+                                    </div>
+                                    <div className="flex justify-between items-end gap-6 pt-4 border-t border-slate-200">
+                                      <div className="text-[10px] font-bold text-slate-400 space-y-1">
+                                        <span className="block font-mono font-black text-slate-800 text-[10px]">BARCODE STAMP</span>
+                                        <span className="block">Diagnostic System Validation</span>
+                                        <span className="block font-mono text-slate-300">{activePatient.id}</span>
+                                      </div>
+                                      <div className="text-right space-y-1">
+                                        <div className="h-8 w-28 bg-slate-50 border border-dashed border-slate-200 flex items-center justify-center rounded-lg text-[9px] text-slate-300 font-extrabold uppercase italic ml-auto select-none">
+                                          Signature
+                                        </div>
+                                        <span className="block text-[11px] text-slate-800 font-black">Dr. Rajesh Sharma, MD</span>
+                                        <span className="block text-[9px] text-slate-400 font-semibold">Pathologist & Lab Director</span>
+                                      </div>
+                                    </div>
+                                  </div>
+                                )}
                               </div>
                             );
                           })()}
