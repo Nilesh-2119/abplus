@@ -77,10 +77,18 @@ export default function ReportsSection({ labId, currentRole }: ReportsProps) {
   }, [patients]);
 
   // Reset to page 0 whenever patient changes
+  const prevPatientIdRef = useRef<string | null>(null);
   useEffect(() => {
-    setCurrentPage(0);
-    if (scrollContainerRef.current) {
-      scrollContainerRef.current.scrollTo({ top: 0, behavior: "smooth" });
+    if (activePatient) {
+      if (prevPatientIdRef.current !== activePatient.id) {
+        setCurrentPage(0);
+        if (scrollContainerRef.current) {
+          scrollContainerRef.current.scrollTo({ top: 0, behavior: "smooth" });
+        }
+        prevPatientIdRef.current = activePatient.id;
+      }
+    } else {
+      prevPatientIdRef.current = null;
     }
   }, [activePatient]);
 
@@ -98,13 +106,13 @@ export default function ReportsSection({ labId, currentRole }: ReportsProps) {
     return "NORMAL";
   };
 
-  // Build "pages": page 0 = cover/patient info, pages 1..N = one test each, last page = footer
+  // Build "pages": pages 0..N-1 = one test each, last page = footer
   const buildPages = (patient: PatientEntry) => {
     type Page =
       | { type: "cover" }
       | { type: "test"; testIndex: number }
       | { type: "footer" };
-    const pages: Page[] = [{ type: "cover" }];
+    const pages: Page[] = [];
     patient.tests.forEach((_, idx) => pages.push({ type: "test", testIndex: idx }));
     pages.push({ type: "footer" });
     return pages;
