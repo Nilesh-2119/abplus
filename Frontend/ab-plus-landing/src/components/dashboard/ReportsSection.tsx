@@ -143,6 +143,45 @@ export default function ReportsSection({ labId, currentRole }: ReportsProps) {
     return () => observer.disconnect();
   }, [activePatient, totalPages]);
 
+  const renderPatientHeader = (patient: PatientEntry) => {
+    return (
+      <div className="border-t border-b border-slate-800 py-1.5 my-2.5 grid grid-cols-12 gap-y-1 text-[11px] font-bold text-slate-800 leading-normal">
+        <div className="col-span-8 flex">
+          <span className="w-16 shrink-0 text-slate-500">PAT ID</span>
+          <span className="mr-2 text-slate-400">:</span>
+          <span className="font-mono font-black text-slate-900">{patient.id}</span>
+        </div>
+        <div className="col-span-4 flex">
+          <span className="w-12 shrink-0 text-slate-500">AGE</span>
+          <span className="mr-2 text-slate-400">:</span>
+          <span className="text-slate-900">{patient.age} Years</span>
+        </div>
+
+        <div className="col-span-8 flex">
+          <span className="w-16 shrink-0 text-slate-500">NAME</span>
+          <span className="mr-2 text-slate-400">:</span>
+          <span className="text-slate-900 uppercase font-black">{patient.name}</span>
+        </div>
+        <div className="col-span-4 flex">
+          <span className="w-12 shrink-0 text-slate-500">SEX</span>
+          <span className="mr-2 text-slate-400">:</span>
+          <span className="text-slate-900">{patient.gender}</span>
+        </div>
+
+        <div className="col-span-8 flex">
+          <span className="w-16 shrink-0 text-slate-500">REF BY</span>
+          <span className="mr-2 text-slate-400">:</span>
+          <span className="text-slate-900 truncate pr-2">{patient.referred_doctor_name || "Self Ref"}</span>
+        </div>
+        <div className="col-span-4 flex">
+          <span className="w-12 shrink-0 text-slate-500">DATE</span>
+          <span className="mr-2 text-slate-400">:</span>
+          <span className="text-slate-900">{patient.created_at}</span>
+        </div>
+      </div>
+    );
+  };
+
   // ── Render a single "page card" ──
   const renderPageContent = (pageIdx: number) => {
     if (!activePatient) return null;
@@ -186,42 +225,8 @@ export default function ReportsSection({ labId, currentRole }: ReportsProps) {
             </div>
           )}
 
-          {/* Patient Info Grid */}
-          <div>
-            <h3 className="text-[11px] font-black text-slate-500 uppercase tracking-widest mb-2.5">
-              Patient Information
-            </h3>
-            <div className="grid grid-cols-2 gap-y-2.5 gap-x-6 p-4 bg-slate-50 border border-slate-100 rounded-xl text-[11px] font-semibold text-slate-600">
-              <div className="flex justify-between">
-                <span className="text-slate-400">Patient ID</span>
-                <span className="font-mono font-black text-slate-800">{activePatient.id}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-slate-400">Date Logged</span>
-                <span className="font-bold text-slate-800">{activePatient.created_at}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-slate-400">Patient Name</span>
-                <span className="font-black text-slate-800">{activePatient.name}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-slate-400">Sample Tubes</span>
-                <span className="font-bold text-slate-800 max-w-[120px] text-right truncate">
-                  {activePatient.tests.map((t) => t.tube_type).join(", ")}
-                </span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-slate-400">Age / Gender</span>
-                <span className="font-bold text-slate-800">{activePatient.age} yrs / {activePatient.gender}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-slate-400">Ref. Doctor</span>
-                <span className="font-bold text-slate-800">
-                  {activePatient.referred_doctor_name || "Self Ref"}
-                </span>
-              </div>
-            </div>
-          </div>
+          {/* Patient Info Header */}
+          {renderPatientHeader(activePatient)}
 
           {/* Tests overview */}
           <div>
@@ -257,18 +262,11 @@ export default function ReportsSection({ labId, currentRole }: ReportsProps) {
       const test = activePatient.tests[page.testIndex];
       return (
         <div className="space-y-4">
+          {renderPatientHeader(activePatient)}
+
           {/* Test Panel Header */}
-          <div className="flex items-center justify-between pb-3 border-b-2 border-slate-800">
-            <div>
-              <h3 className="text-[16px] font-black text-slate-900 uppercase tracking-wide">{test.name}</h3>
-              <p className="text-[11px] text-slate-400 font-semibold mt-0.5">Report Panel</p>
-            </div>
-            <div className="text-right">
-              <span className="text-[11px] font-extrabold text-cyan-600 bg-cyan-50 px-2.5 py-1 rounded-lg border border-cyan-100 uppercase tracking-wider font-mono">
-                {activePatient.id}
-              </span>
-              <p className="text-[10px] text-slate-400 font-bold mt-1">{activePatient.name}</p>
-            </div>
+          <div className="text-center pb-2">
+            <h3 className="text-[14px] font-black text-slate-900 uppercase tracking-widest">{test.name}</h3>
           </div>
 
           {/* Results Table */}
@@ -336,6 +334,7 @@ export default function ReportsSection({ labId, currentRole }: ReportsProps) {
     if (page.type === "footer") {
       return (
         <div className="space-y-6">
+          {renderPatientHeader(activePatient)}
           {/* Summary */}
           <div className="pb-4 border-b border-slate-200">
             <h3 className="text-[11px] font-black text-slate-500 uppercase tracking-widest mb-3">Summary</h3>
@@ -638,38 +637,8 @@ export default function ReportsSection({ labId, currentRole }: ReportsProps) {
                                 </div>
                               )}
 
-                              {/* Patient Info Grid */}
-                              <div>
-                                <h3 className="text-[11px] font-black text-slate-500 uppercase tracking-widest mb-2.5">
-                                  Patient Information
-                                </h3>
-                                <div className="grid grid-cols-2 gap-y-2.5 gap-x-6 p-4 bg-slate-50 border border-slate-100 rounded-xl text-[11px] font-semibold text-slate-600">
-                                  <div className="flex justify-between">
-                                    <span className="text-slate-400">Patient ID:</span>
-                                    <span className="font-mono font-black text-slate-800">{activePatient.id}</span>
-                                  </div>
-                                  <div className="flex justify-between">
-                                    <span className="text-slate-400">Date Logged:</span>
-                                    <span className="font-bold text-slate-800">{activePatient.created_at}</span>
-                                  </div>
-                                  <div className="flex justify-between">
-                                    <span className="text-slate-400">Patient Name:</span>
-                                    <span className="font-black text-slate-800">{activePatient.name}</span>
-                                  </div>
-                                  <div className="flex justify-between">
-                                    <span className="text-slate-400">Sample Tube:</span>
-                                    <span className="font-bold text-slate-800">{activePatient.tests.map(t => t.tube_type).join(", ")}</span>
-                                  </div>
-                                  <div className="flex justify-between">
-                                    <span className="text-slate-400">Age / Gender:</span>
-                                    <span className="font-bold text-slate-800">{activePatient.age} yrs / {activePatient.gender}</span>
-                                  </div>
-                                  <div className="flex justify-between">
-                                    <span className="text-slate-400">Ref Doctor:</span>
-                                    <span className="font-bold text-slate-800">{activePatient.referred_doctor_name || "Self Ref"}</span>
-                                  </div>
-                                </div>
-                              </div>
+                              {/* Patient Info Header */}
+                              {renderPatientHeader(activePatient)}
 
                               {/* Tests list */}
                               <div>
@@ -697,17 +666,11 @@ export default function ReportsSection({ labId, currentRole }: ReportsProps) {
                             const test = activePatient.tests[page.testIndex];
                             return (
                               <div className="space-y-4">
-                                <div className="flex items-center justify-between pb-2.5 border-b-2 border-slate-800">
-                                  <div>
-                                    <h3 className="text-[15px] font-black text-slate-900 uppercase tracking-wide">{test.name}</h3>
-                                    <p className="text-[10px] text-slate-400 font-semibold mt-0.5">Report Panel</p>
-                                  </div>
-                                  <div className="text-right">
-                                    <span className="text-[10px] font-extrabold text-cyan-600 bg-cyan-50 px-2 py-0.5 rounded border uppercase tracking-wider font-mono">
-                                      {activePatient.id}
-                                    </span>
-                                    <p className="text-[10px] text-slate-400 font-bold mt-1">{activePatient.name}</p>
-                                  </div>
+                                {renderPatientHeader(activePatient)}
+
+                                {/* Test Panel Header */}
+                                <div className="text-center pb-2">
+                                  <h3 className="text-[14px] font-black text-slate-900 uppercase tracking-widest">{test.name}</h3>
                                 </div>
 
                                 <table className="w-full text-left border-collapse text-[11px] font-semibold">
@@ -756,6 +719,7 @@ export default function ReportsSection({ labId, currentRole }: ReportsProps) {
 
                           {page.type === "footer" && (
                             <div className="space-y-6">
+                              {renderPatientHeader(activePatient)}
                               <div className="pb-4 border-b border-slate-200">
                                 <h3 className="text-[11px] font-black text-slate-500 uppercase tracking-widest mb-3">Diagnostic Summary</h3>
                                 <div className="grid grid-cols-3 gap-2 text-center">
