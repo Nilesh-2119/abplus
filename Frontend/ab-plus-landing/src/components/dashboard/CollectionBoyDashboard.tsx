@@ -25,7 +25,8 @@ import {
   X,
   Stethoscope,
   Beaker,
-  IndianRupee
+  IndianRupee,
+  QrCode
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -76,6 +77,7 @@ export default function CollectionBoyDashboard({
     cash_not_submitted?: number;
     total_pending_receivables?: number;
     total_pending_patients?: number;
+    online_collected_today?: number;
   }>({
     total_patients: 0,
     settled_patients: 0,
@@ -93,6 +95,7 @@ export default function CollectionBoyDashboard({
     todays_collected: 0,
     cash_not_submitted: 0,
     total_pending_receivables: 0,
+    online_collected_today: 0,
     total_pending_patients: 0,
   });
 
@@ -380,7 +383,7 @@ export default function CollectionBoyDashboard({
           )}
 
           {/* ── BIG STAT CARDS (Grid) ── */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
             {/* Card 1: Net Cash In Hand (carry-forward) */}
             <div className="bg-gradient-to-br from-cyan-500 to-blue-600 p-5 rounded-2xl shadow-md text-white flex flex-col justify-between min-h-[120px]">
               <div>
@@ -408,6 +411,21 @@ export default function CollectionBoyDashboard({
               </div>
               <span className="text-[10px] text-blue-500 font-bold block mt-2 flex items-center gap-1">
                 <IndianRupee size={11} /> this date only
+              </span>
+            </div>
+
+            {/* Card 2.5: Online Payment Received (date-specific) */}
+            <div className="bg-white border border-slate-200/80 p-5 rounded-2xl shadow-sm flex flex-col justify-between min-h-[120px]">
+              <div>
+                <span className="text-[9px] font-black text-slate-400 uppercase tracking-wider block">
+                  Online Payment Received
+                </span>
+                <span className="text-2xl font-black text-violet-600 tracking-tight block mt-1">
+                  ₹{stats.online_collected_today ?? 0}
+                </span>
+              </div>
+              <span className="text-[10px] text-violet-600 font-bold block mt-2 flex items-center gap-1">
+                <QrCode size={11} /> direct to bank
               </span>
             </div>
 
