@@ -842,7 +842,7 @@ class PaymentTransaction(SoftDeleteModel):
         if not self.transaction_time:
             self.transaction_time = timezone.localtime().time()
             
-        if not self.collection_boy:
+        if not self.collection_boy or self.payment_mode != 'CASH':
             self.submitted_to_cashier = 'Y'
             if not self.cashier_received_at:
                 self.cashier_received_at = timezone.now()

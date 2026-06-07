@@ -94,7 +94,8 @@ export default function PatientWorkflow({ labId, currentRole, userName = "Staff"
   // Payment inside drawer
   const [receiveAmount, setReceiveAmount] = useState("");
   const [concessionAmount, setConcessionAmount] = useState("");
-  const [paymentMode, setPaymentMode] = useState<"CASH" | "CARD" | "UPI" | "CREDIT">("CASH");
+  const [paymentMode, setPaymentMode] = useState<"CASH" | "UPI">("CASH");
+  const [patPaymentMode, setPatPaymentMode] = useState<"CASH" | "UPI">("CASH");
   const [paymentNotes, setPaymentNotes] = useState("");
   const [paymentMsg, setPaymentMsg] = useState<{ type: "error" | "success"; text: string } | null>(null);
   const [processingPayment, setProcessingPayment] = useState(false);
@@ -284,10 +285,11 @@ export default function PatientWorkflow({ labId, currentRole, userName = "Staff"
         referred_doctor_id: selectedReferredDoctorId || undefined,
         referred_doctor_name: patReferredDoctorName || undefined,
         collected_by: currentRole === "COLLECTION_BOY" ? userName : "",
-        created_at: patDate
+        created_at: patDate,
+        payment_mode: patPaymentMode
       });
       setPatName(""); setPatAge(""); setPatGender("Male"); setPatPhone("");
-      setSelectedTests([]); setPaidAmount("");
+      setSelectedTests([]); setPaidAmount(""); setPatPaymentMode("CASH");
       setSelectedReferredDoctorId(""); setPatReferredDoctorName("");
       setPatDate(new Date().toISOString().split("T")[0]);
       setRegisterModalOpen(false);
@@ -939,6 +941,35 @@ export default function PatientWorkflow({ labId, currentRole, userName = "Staff"
                     />
                   </div>
 
+                  {/* Payment Mode Selection */}
+                  <div>
+                    <label className="block text-[9px] font-extrabold text-slate-400 uppercase tracking-wide mb-1.5">Payment Mode</label>
+                    <div className="flex gap-2">
+                      {["CASH", "UPI"].map(mode => (
+                        <button
+                          key={mode}
+                          type="button"
+                          onClick={() => {
+                            setPaymentMode(mode as any);
+                            if (mode === "UPI") {
+                              setReceiveAmount(drawerPending.toString());
+                              setConcessionAmount("");
+                            } else {
+                              setReceiveAmount("");
+                            }
+                          }}
+                          className={`flex-1 py-1.5 text-[11px] font-bold rounded-lg border transition-all cursor-pointer ${
+                            paymentMode === mode
+                              ? "bg-cyan-50 border-cyan-500 text-cyan-600 shadow-sm"
+                              : "bg-white border-slate-200 text-slate-500 hover:bg-slate-50"
+                          }`}
+                        >
+                          {mode === "CASH" ? "💸 Cash / Partial" : "📱 UPI (Full)"}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
                   {/* Receive Amount and Concession Amount */}
                   <div className="grid grid-cols-2 gap-3">
                     <div>
@@ -950,7 +981,7 @@ export default function PatientWorkflow({ labId, currentRole, userName = "Staff"
                         placeholder="Amount"
                         value={receiveAmount}
                         onChange={e => { setReceiveAmount(e.target.value); setPaymentMsg(null); }}
-                        className="w-full rounded-xl border border-slate-200 px-3 py-2 text-xs font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-cyan-500/20"
+                        className="w-full rounded-xl border border-slate-200 px-3 py-2 text-xs font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-cyan-500/20 bg-white"
                       />
                     </div>
                     <div>
@@ -962,7 +993,7 @@ export default function PatientWorkflow({ labId, currentRole, userName = "Staff"
                         placeholder="Concession"
                         value={concessionAmount}
                         onChange={e => { setConcessionAmount(e.target.value); setPaymentMsg(null); }}
-                        className="w-full rounded-xl border border-slate-200 px-3 py-2 text-xs font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-cyan-500/20"
+                        className="w-full rounded-xl border border-slate-200 px-3 py-2 text-xs font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-cyan-500/20 bg-white"
                       />
                     </div>
                   </div>
@@ -1328,17 +1359,52 @@ export default function PatientWorkflow({ labId, currentRole, userName = "Staff"
                   </div>
                 )}
 
+                {/* Payment Mode Selection */}
+                <div className="border-t border-slate-100 pt-3">
+                  <label className="block text-[10px] font-extrabold text-slate-400 uppercase tracking-wide mb-1.5">Payment Mode</label>
+                  <div className="flex gap-2">
+                    {["CASH", "UPI"].map(mode => (
+                      <button
+                        key={mode}
+                        type="button"
+                        onClick={() => {
+                          setPatPaymentMode(mode as any);
+                          if (mode === "UPI") {
+                            const totalBill = selectedTests.reduce((s, t) => s + Number(t.price), 0);
+                            setPaidAmount(totalBill.toString());
+                          } else {
+                            setPaidAmount("");
+                          }
+                        }}
+                        className={`flex-1 py-2 text-xs font-bold rounded-xl border transition-all cursor-pointer ${
+                          patPaymentMode === mode
+                            ? "bg-cyan-50 border-cyan-500 text-cyan-600 shadow-sm"
+                            : "bg-white border-slate-200 text-slate-500 hover:bg-slate-50"
+                        }`}
+                      >
+                        {mode === "CASH" ? "💸 Cash / Unpaid" : "📱 UPI (Online)"}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
                 {/* Billing + Initial Payment */}
-                <div className="grid grid-cols-2 gap-3 border-t border-slate-100 pt-3">
+                <div className="grid grid-cols-2 gap-3 pt-3">
                   <div>
                     <label className="block text-[10px] font-extrabold text-slate-400 uppercase tracking-wide">Total Amount</label>
                     <p className="text-lg font-black text-slate-800 mt-1">₹{selectedTests.reduce((s, t) => s + Number(t.price), 0).toFixed(2)}</p>
                   </div>
                   <div>
-                    <label className="block text-[10px] font-extrabold text-slate-400 uppercase tracking-wide">Initial Paid (₹)</label>
-                    <input type="number" placeholder="e.g. 500" value={paidAmount}
+                    <label className="block text-[10px] font-extrabold text-slate-400 uppercase tracking-wide">
+                      Initial Paid (₹)
+                    </label>
+                    <input
+                      type="number"
+                      placeholder="e.g. 500"
+                      value={paidAmount}
                       onChange={e => setPaidAmount(e.target.value)}
-                      className="w-full mt-1 rounded-xl border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-cyan-500/20" />
+                      className="w-full mt-1 rounded-xl border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-cyan-500/20 bg-white"
+                    />
                   </div>
                 </div>
 

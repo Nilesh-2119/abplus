@@ -122,7 +122,7 @@ export default function CollectionBoyDashboard({
   const [selectedTests, setSelectedTests] = useState<PathologyTest[]>([]);
   const [testSearchQuery, setTestSearchQuery] = useState("");
   const [paidAmount, setPaidAmount] = useState("");
-
+  const [patPaymentMode, setPatPaymentMode] = useState<"CASH" | "UPI">("CASH");
   // Debounced referred doctor lookup
   useEffect(() => {
     if (!docDropdownOpen || !patReferredDoctorName.trim()) return;
@@ -263,7 +263,8 @@ export default function CollectionBoyDashboard({
         referred_doctor_name: patReferredDoctorName.trim() || undefined,
         referred_doctor_id: selectedReferredDoctorId || undefined,
         collected_by: userName,
-        created_at: patDate
+        created_at: patDate,
+        payment_mode: patPaymentMode
       });
 
       // Clear Form and Close Modal
@@ -275,6 +276,7 @@ export default function CollectionBoyDashboard({
       setSelectedReferredDoctorId("");
       setSelectedTests([]);
       setPaidAmount("");
+      setPatPaymentMode("CASH");
       setPatDate(new Date().toISOString().split("T")[0]);
       setRegisterModalOpen(false);
 
@@ -895,8 +897,37 @@ export default function CollectionBoyDashboard({
                   </div>
                 )}
 
+                {/* Payment Mode Selection */}
+                <div className="border-t border-slate-100 pt-3">
+                  <label className="block text-[10px] font-extrabold text-slate-400 uppercase tracking-wide mb-1.5">Payment Mode</label>
+                  <div className="flex gap-2">
+                    {["CASH", "UPI"].map(mode => (
+                      <button
+                        key={mode}
+                        type="button"
+                        onClick={() => {
+                          setPatPaymentMode(mode as any);
+                          if (mode === "UPI") {
+                            const totalBill = selectedTests.reduce((s, t) => s + Number(t.price), 0);
+                            setPaidAmount(totalBill.toString());
+                          } else {
+                            setPaidAmount("");
+                          }
+                        }}
+                        className={`flex-1 py-2 text-xs font-bold rounded-xl border transition-all cursor-pointer ${
+                          patPaymentMode === mode
+                            ? "bg-cyan-50 border-cyan-500 text-cyan-600 shadow-sm"
+                            : "bg-white border-slate-200 text-slate-500 hover:bg-slate-50"
+                        }`}
+                      >
+                        {mode === "CASH" ? "💸 Cash / Unpaid" : "📱 UPI (Online)"}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
                 {/* Billing + Initial Payment */}
-                <div className="grid grid-cols-2 gap-3 border-t border-slate-100 pt-3">
+                <div className="grid grid-cols-2 gap-3 pt-3">
                   <div>
                     <label className="block text-[10px] font-extrabold text-slate-400 uppercase tracking-wide">
                       Total Amount
@@ -914,7 +945,7 @@ export default function CollectionBoyDashboard({
                       placeholder="e.g. 500"
                       value={paidAmount}
                       onChange={(e) => setPaidAmount(e.target.value)}
-                      className="w-full mt-1 rounded-xl border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-cyan-500/20"
+                      className="w-full mt-1 rounded-xl border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-cyan-500/20 bg-white"
                     />
                   </div>
                 </div>

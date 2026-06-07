@@ -330,6 +330,12 @@ class DashboardStatsView(views.APIView):
                 previous_cash_pending = float(receipts_yesterday) + float(desk_cash_yesterday) - float(settled_gross_yesterday) - float(unsubmitted_expenses_yesterday)
                 previous_cash_pending = max(0.0, previous_cash_pending)
 
+                online_today = PaymentTransaction.objects.filter(
+                    lab_id=lab_id,
+                    transaction_date=selected_date,
+                    delete_flag='N'
+                ).exclude(payment_mode='CASH').aggregate(total=Sum('amount_received'))['total'] or 0.0
+
                 return Response({
                     "cashier_mode": True,
                     "net_cash_received": float(net_cash_received),
@@ -340,7 +346,8 @@ class DashboardStatsView(views.APIView):
                     "cash_submitted_today": float(cash_submitted_today),
                     "total_submitted_today": float(cash_submitted_today), # Backward compatibility
                     "previous_cash_pending": float(previous_cash_pending),
-                    "cash_not_submitted_to_admin": float(cash_in_vault)
+                    "cash_not_submitted_to_admin": float(cash_in_vault),
+                    "online_payment_received": float(online_today)
                 })
 
             # For ADMIN/General dashboard
@@ -440,6 +447,12 @@ class DashboardStatsView(views.APIView):
             ).aggregate(total=Sum('final_cash'))['total'] or 0.0
 
 
+            online_today = PaymentTransaction.objects.filter(
+                lab_id=lab_id,
+                transaction_date=selected_date,
+                delete_flag='N'
+            ).exclude(payment_mode='CASH').aggregate(total=Sum('amount_received'))['total'] or 0.0
+
             return Response({
                 "today_patients": today_patients,
                 "pending_reports": pending_reports,
@@ -453,6 +466,7 @@ class DashboardStatsView(views.APIView):
                 "received_from_cashier_today": float(received_from_cashier_today),
                 # Kept for backward compatibility
                 "lab_cash_collection_pending": float(cash_available_in_vault),
+                "online_payment_received": float(online_today),
             })
             
         # 2. Super Admin Dashboard Stats
@@ -1382,6 +1396,7 @@ def get_or_create_daily_snapshots(user, target_date, lab_id):
     # Check earliest PaymentTransaction
     p_min = PaymentTransaction.objects.filter(
         collection_boy=user,
+        payment_mode='CASH',
         delete_flag='N'
     ).aggregate(min_val=Min('transaction_date'))['min_val']
     if p_min:
@@ -1441,6 +1456,7 @@ def get_or_create_daily_snapshots(user, target_date, lab_id):
         cash_collected_today = float(PaymentTransaction.objects.filter(
             collection_boy=user,
             transaction_date=current_date,
+            payment_mode='CASH',
             delete_flag='N'
         ).aggregate(total=Sum('amount_received'))['total'] or 0.0)
         
@@ -1609,6 +1625,14 @@ class CollectionDashboardStatsView(views.APIView):
                 delete_flag='N'
             ).aggregate(total=Sum('concession_amount'))['total'] or 0.0)
 
+            # 1.5. Today's online/UPI collections (date-specific)
+            online_collected_today = float(PaymentTransaction.objects.filter(
+                collection_boy=resolved_boy,
+                transaction_date=selected_date,
+                payment_mode='UPI',
+                delete_flag='N'
+            ).aggregate(total=Sum('amount_received'))['total'] or 0.0)
+
             # Assign values from the snapshot
             todays_collected = float(snapshot.cash_collected_today) if snapshot else 0.0
             cash_not_submitted = float(snapshot.opening_cash_balance) if snapshot else 0.0
@@ -1676,6 +1700,7 @@ class CollectionDashboardStatsView(views.APIView):
 
         else:
             todays_collected = 0.0
+            online_collected_today = 0.0
             cash_not_submitted = 0.0
             submitted_cash_today = 0.0
             unsubmitted_expenses = 0.0
@@ -1694,7 +1719,8 @@ class CollectionDashboardStatsView(views.APIView):
                     delete_flag='N'
                 )
                 concession_totals = float(txns.aggregate(total=Sum('concession_amount'))['total'] or 0.0)
-                todays_collected = float(txns.aggregate(total=Sum('amount_received'))['total'] or 0.0)
+                todays_collected = float(txns.filter(payment_mode='CASH').aggregate(total=Sum('amount_received'))['total'] or 0.0)
+                online_collected_today = float(txns.filter(payment_mode='UPI').aggregate(total=Sum('amount_received'))['total'] or 0.0)
 
         # ── SETTLEMENT STATUS (date-aware) ──
         settlement_status = 'PENDING'
@@ -1731,6 +1757,7 @@ class CollectionDashboardStatsView(views.APIView):
             "settled_patients": settled_patients,
             "pending_patients": pending_patients,
             "total_collected": float(todays_collected),        # date-specific: cash collected on selected date
+            "online_collected_today": float(online_collected_today), # date-specific: UPI collected on selected date
             "total_expenses": float(unsubmitted_expenses),     # cumulative unsubmitted expenses up to date
             "today_expenses": float(today_expenses),           # date-specific expenses
             "net_cash": float(net_cash_in_hand),               # cumulative carry-forward
